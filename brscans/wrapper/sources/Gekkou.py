@@ -1,5 +1,6 @@
 from copyreg import constructor
 import re
+import sys
 from unidecode import unidecode
 import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag, NavigableString, Comment
@@ -13,6 +14,7 @@ class Gekkou:
     def homepage(self):
         response = httpx.get(self.url)
         print(response)
+        sys.stdout.flush()
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
         capes: ResultSet[Tag] = soup.find_all("div", class_="page-item-detail")
