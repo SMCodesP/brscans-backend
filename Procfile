@@ -1,1 +1,1 @@
-web: gunicorn brscans.wsgi
+web: gunicorn brscans.wsgi --log-file - --bind
