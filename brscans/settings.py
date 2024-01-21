@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-y3ji3t=%kq$4%i95)-kqh6ey&dae795dve-r^+_xb_xm62s43&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["frozen-lake-05035-ee8291762713.herokuapp.com"]
 
 CORS_ORIGIN_ALLOW_ALL = True
 
