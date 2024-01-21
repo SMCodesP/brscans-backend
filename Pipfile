@@ -13,6 +13,8 @@ unidecode="1.3.8"
 pyanime4k = "*"
 requests = "*"
 django-cors-headers = "*"
+whitenoise = "*"
+gunicorn = "*"
 
 [dev-packages]
 
