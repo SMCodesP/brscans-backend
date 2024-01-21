@@ -21,10 +21,10 @@ class WrapperViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def homepage(self, request):
-        # gekkou = Gekkou()
-        # return Response(gekkou.homepage())
-        cerise = Cerise()
-        return Response(cerise.homepage())
+        gekkou = Gekkou()
+        return Response(gekkou.homepage())
+        # cerise = Cerise()
+        # return Response(cerise.homepage())
 
     @action(detail=False, methods=["get"])
     def search(self, request: Request):
