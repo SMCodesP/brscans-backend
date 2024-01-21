@@ -13,8 +13,13 @@ class Gekkou:
 
     def homepage(self):
         response = httpx.get(self.url)
-        print(response)
-        sys.stdout.flush()
+        return {
+            "text": response.text,
+            "status": response.status_code,
+            "headers": response.headers,
+        }
+        # print(response)
+        # sys.stdout.flush()
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
         capes: ResultSet[Tag] = soup.find_all("div", class_="page-item-detail")
