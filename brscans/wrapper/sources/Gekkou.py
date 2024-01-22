@@ -4,15 +4,18 @@ import sys
 from unidecode import unidecode
 import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag, NavigableString, Comment
+import cloudscraper
 
 
 class Gekkou:
     def __init__(self, headers=None) -> None:
         self.headers = headers
         self.url = "https://gekkou.site"
+        self.client = cloudscraper.create_scraper()
 
     def homepage(self):
-        response = httpx.get(self.url)
+        response = self.client.get(self.url)
+        print(response)
         return {
             "text": response.text,
             "status": response.status_code,

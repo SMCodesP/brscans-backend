@@ -15,6 +15,7 @@ requests = "*"
 django-cors-headers = "*"
 whitenoise = "*"
 gunicorn = "*"
+cloudscraper = "*"
 
 [dev-packages]
 
