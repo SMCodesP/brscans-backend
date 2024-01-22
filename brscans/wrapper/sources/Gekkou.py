@@ -1,8 +1,5 @@
 from copyreg import constructor
-import re
-import sys
 from unidecode import unidecode
-import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag, NavigableString, Comment
 import cloudscraper
 
@@ -15,14 +12,6 @@ class Gekkou:
 
     def homepage(self):
         response = self.client.get(self.url)
-        print(response)
-        return {
-            "text": response.text,
-            "status": response.status_code,
-            "headers": response.headers,
-        }
-        # print(response)
-        # sys.stdout.flush()
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
         capes: ResultSet[Tag] = soup.find_all("div", class_="page-item-detail")
@@ -44,7 +33,9 @@ class Gekkou:
         return manhwas
 
     def search(self, query: str):
-        response = httpx.get(self.url, params={"s": query, "post_type": "wp-manga"})
+        response = self.client.get(
+            self.url, params={"s": query, "post_type": "wp-manga"}
+        )
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -69,7 +60,7 @@ class Gekkou:
         return manhwas
 
     def info(self, id: str, capthers: bool = False):
-        response = httpx.post(self.url + f"/manga/{id}/")
+        response = self.client.post(self.url + f"/manga/{id}/")
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -91,7 +82,7 @@ class Gekkou:
         return manhwa
 
     def chapters(self, id: str):
-        response = httpx.post(self.url + f"/manga/{id}/ajax/chapters")
+        response = self.client.post(self.url + f"/manga/{id}/ajax/chapters")
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -119,7 +110,7 @@ class Gekkou:
 
     def pages(self, manhwa: str, chapter: str, upscale: bool = False):
         print(f"{self.url}/manga/{manhwa}/{chapter}")
-        response = httpx.get(f"{self.url}/manga/{manhwa}/{chapter}/")
+        response = self.client.get(f"{self.url}/manga/{manhwa}/{chapter}/")
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
