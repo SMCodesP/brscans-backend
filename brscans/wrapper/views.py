@@ -1,4 +1,4 @@
-from django.http import FileResponse
+from django.http import HttpResponseRedirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 
 from rest_framework.response import Response
 from rest_framework.request import Request
+from brscans import settings
 from brscans.utils.anime4k import Anime4k
 
 from brscans.wrapper.sources.Nexo import Nexo
@@ -23,8 +24,6 @@ class WrapperViewSet(viewsets.ViewSet):
     def homepage(self, request):
         gekkou = Gekkou()
         return Response(gekkou.homepage())
-        # cerise = Cerise()
-        # return Response(cerise.homepage())
 
     @action(detail=False, methods=["get"])
     def search(self, request: Request):
@@ -44,6 +43,12 @@ class WrapperViewSet(viewsets.ViewSet):
         return Response(gekkou.chapters(pk))
 
     @action(detail=True, methods=["get"])
+    def chapter(self, request: Request, pk=None):
+        cap = request.query_params.get("cap")
+        gekkou = Gekkou()
+        return Response(gekkou.chapter(pk, cap))
+
+    @action(detail=True, methods=["get"])
     @method_decorator(cache_page(60 * 60 * 2))
     def pages(self, request: Request, pk=None):
         cap = request.query_params.get("cap")
@@ -57,6 +62,7 @@ class WrapperViewSet(viewsets.ViewSet):
         image = request.query_params.get("image")
         anime4k = Anime4k()
         path = anime4k.upscale_remote_image(image)
-        print(path)
 
-        return FileResponse(open(path, "rb"), content_type="image/png")
+        path_relative = path.replace(settings.MEDIA_ROOT, "")
+
+        return HttpResponseRedirect(f"{settings.MEDIA_URL}{path_relative}")

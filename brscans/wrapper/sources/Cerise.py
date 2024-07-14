@@ -10,6 +10,7 @@ class Cerise:
         self.headers = headers
         self.url = "https://cerisescan.net"
         self.client = httpx.Client(timeout=None)
+        self.name = "Cerise"
 
     def homepage(self):
         response = self.client.get(self.url)

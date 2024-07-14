@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 import tempfile
 import requests
 
-from pyanime4k import ac
-import pyanime4k
+
+from brscans import settings
 
 
 class Anime4k:
@@ -11,19 +12,19 @@ class Anime4k:
         self.parameters = ac.Parameters()
         self.parameters.HDN = True
 
-    def upscale_image(self, image: Path):
-        temp_up = tempfile.mkstemp(suffix=".png")[1]
-        a = ac.AC(False, False, type=ac.ProcessorType.CPUCNN)
-
-        a.load_image(str(image.resolve()))
-        a.process()
-        a.save_image(temp_up)
-
+    def upscale_image(self, image: Path, url: str):
+        temp_up = os.path.join(settings.MEDIA_ROOT, "imagens", f"{hash(url)}.png")
         return temp_up
 
     def upscale_remote_image(self, image: str, suffix_input: str = ".webp"):
+        if os.path.exists(
+            os.path.join(settings.MEDIA_ROOT, "imagens", f"{hash(image)}.png")
+        ):
+            return os.path.join(settings.MEDIA_ROOT, "imagens", f"{hash(image)}.png")
+
         response = requests.get(image)
         temp = Path(tempfile.mkstemp(suffix=suffix_input)[1])
         temp.write_bytes(response.content)
 
-        return self.upscale_image(temp)
+        return self.upscale_image(temp, image)
+        # return temp

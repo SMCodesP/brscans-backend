@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -24,8 +25,13 @@ SECRET_KEY = "django-insecure-y3ji3t=%kq$4%i95)-kqh6ey&dae795dve-r^+_xb_xm62s43&
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+PRODUCTION = os.environ.get("PRODUCTION", "False") == "True"
 
-ALLOWED_HOSTS = ["frozen-lake-05035-ee8291762713.herokuapp.com", "localhost"]
+USE_S3 = True
+ALLOWED_HOSTS = [
+    "*",
+]
+INTERNAL_IPS = ["127.0.0.1", "localhost"]
 
 CORS_ORIGIN_ALLOW_ALL = True
 
@@ -33,6 +39,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 # Application definition
 
 INSTALLED_APPS = [
+    "debug_toolbar",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -45,6 +52,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -82,8 +90,12 @@ WSGI_APPLICATION = "brscans.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": os.environ.get("DATABASE_ENGINE"),
+        "NAME": os.environ.get("DATABASE_NAME"),
+        "USER": os.environ.get("DATABASE_USER"),
+        "PASSWORD": os.environ.get("DATABASE_PASS"),
+        "HOST": os.environ.get("DATABASE_HOST"),
+        "PORT": os.environ.get("DATABASE_PORT"),
     }
 }
 
@@ -122,10 +134,37 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+if PRODUCTION:
+    CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN")
+
+    AWS_ACCESS_KEY_ID = os.environ.get("aws_access_key_id")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("aws_secret_access_key")
+    AWS_SESSION_TOKEN = os.environ.get("aws_session_token")
+
+    AWS_STORAGE_BUCKET_NAME = os.environ.get("S3_STATIC_BUCKET")
+    AWS_S3_REGION_NAME = os.environ.get("S3_REGION")
+    AWS_QUERYSTRING_EXPIRE = 604800
+    AWS_S3_CUSTOM_DOMAIN = f"{CLOUDFRONT_DOMAIN}"
+
+    STATICFILES_STORAGE = "brscans.storage_backends.StaticStorage"
+    STATIC_URL = f"https://{CLOUDFRONT_DOMAIN}/static/"
+    STATIC_LOCATION = "static"
+
+    DEFAULT_FILE_STORAGE = "brscans.storage_backends.MediaStorage"
+    MEDIA_URL = f"https://{CLOUDFRONT_DOMAIN}/media/"
+    PUBLIC_MEDIA_LOCATION = "media"
+else:
+    STATIC_ROOT = os.path.join(BASE_DIR, "..", "static")
+    STATIC_URL = "static/"
+
+    # our configuration
+    MEDIA_ROOT = os.path.join(BASE_DIR, "..", "uploaded_files")
+    MEDIA_URL = "/media/"
+
+
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024

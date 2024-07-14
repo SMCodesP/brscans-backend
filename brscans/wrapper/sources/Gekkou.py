@@ -9,6 +9,7 @@ class Gekkou:
         self.headers = headers
         self.url = "https://gekkou.site"
         self.client = cloudscraper.create_scraper()
+        self.name = "Gekkou"
 
     def homepage(self):
         response = self.client.get(self.url)
@@ -108,6 +109,34 @@ class Gekkou:
 
         return chapters
 
+    def chapter(self, manhwa: str, chapter: str):
+        pages = self.pages(manhwa, chapter)
+        manhwa = self.info(manhwa)
+        chapters = self.chapters(manhwa["id"])
+
+        ids = [item["id"] for item in chapters]
+        print(ids.index(chapter))
+
+        next_chapter = (
+            chapters[ids.index(chapter) - 1]["id"] if ids.index(chapter) > 0 else None
+        )
+        prev_chapter = (
+            chapters[ids.index(chapter) + 1]["id"]
+            if ids.index(chapter) < len(chapters) - 1
+            else None
+        )
+        # next_chapter = chapters[chapters.index(chapter) + 1]["id"]
+        # prev_chapter = chapters[chapters.index(chapter) - 1]["id"]
+
+        return {
+            "id": chapter,
+            "title": manhwa["title"],
+            "next_chapter": next_chapter,
+            "prev_chapter": prev_chapter,
+            "chapters": chapters,
+            "pages": pages,
+        }
+
     def pages(self, manhwa: str, chapter: str, upscale: bool = False):
         print(f"{self.url}/manga/{manhwa}/{chapter}")
         response = self.client.get(f"{self.url}/manga/{manhwa}/{chapter}/")
@@ -122,7 +151,7 @@ class Gekkou:
         for cape in capes:
             url = cape.get("data-src").strip()
             if upscale:
-                url = f"http://localhost:8000/wrapper/anime4k?image={url}"
+                url = f"http://192.168.31.49:8000/wrapper/anime4k?image={url}"
             pages.append(url)
 
         return pages

@@ -1,1 +1,0 @@
-web: gunicorn brscans.wsgi --log-file -
