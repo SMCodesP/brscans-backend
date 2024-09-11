@@ -9,6 +9,7 @@ from brscans.wrapper.sources.Generic import Generic
 def sync_chapters(manhwa_id: int):
     manhwa = Manhwa.objects.filter(id=manhwa_id).first()
     chapters = Generic.chapters(manhwa.source)
+    chapters = reversed(chapters)
 
     for chapter in chapters:
         chapter_records = Chapter.objects.filter(

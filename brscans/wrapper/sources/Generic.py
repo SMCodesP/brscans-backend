@@ -50,6 +50,7 @@ class Generic:
         summary = soup.find("div", class_="summary__content").get_text().strip()
         image = soup.find("div", class_="summary_image").find("img")
         image = image.get("src") or image.get("data-src")
+        image = re.sub(r"-\d+x\d+(?=\.\w{3,4}$)", "", image)
 
         manhwa = {
             "id": id,

@@ -22,6 +22,6 @@
         "timeout_seconds": 600,
         "async_source": "sns",
         "async_resources": true,
-        "memory_size": 2048
+        "memory_size": 512
     }
 }

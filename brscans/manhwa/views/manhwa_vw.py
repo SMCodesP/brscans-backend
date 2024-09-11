@@ -4,16 +4,31 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 
-from brscans.manhwa.models import Manhwa
-from brscans.manhwa.serializers import ManhwaSerializer
+from brscans.manhwa.models import ImageVariants, Manhwa
+from brscans.manhwa.serializers import ManhwaDetailSerializer, ManhwaSerializer
+from brscans.manhwa.tasks.images_variants import add_original_image_variant
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
+from brscans.pagination import TotalPagination
 from brscans.wrapper.sources.Generic import Generic
 
 
 class ManhwaViewSet(viewsets.ModelViewSet):
-    queryset = Manhwa.objects.all()
+    queryset = (
+        Manhwa.objects.all()
+        .order_by("-id")
+        .select_related("thumbnail")
+        .prefetch_related("genres")
+    )
     serializer_class = ManhwaSerializer
     permission_classes = []
+    pagination_class = TotalPagination
+
+    def retrieve(self, request, *args, **kwargs):
+        self.queryset = self.queryset.prefetch_related(
+            "chapters", "chapters__pages", "chapters__pages__images"
+        )
+        self.serializer_class = ManhwaDetailSerializer
+        return super().retrieve(request, *args, **kwargs)
 
     @action(detail=False, methods=["get"])
     def search(self, request):
@@ -27,12 +42,6 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             | Q(source__name__icontains=query)
         )
 
-        serializer = ManhwaSerializer(manhwas, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=["get"])
-    def sync(self, request):
-        manhwas = Manhwa.objects.all()
         serializer = ManhwaSerializer(manhwas, many=True)
         return Response(serializer.data)
 
@@ -57,6 +66,13 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             source=result.get("url"),
             description=result.get("summary"),
             identifier=identifier,
+        )
+        thumbnail = ImageVariants.objects.create()
+        manhwa.thumbnail = thumbnail
+        manhwa.save()
+
+        add_original_image_variant(
+            thumbnail.pk, result.get("image"), ["chapters", str(manhwa.pk)], False
         )
         sync_chapters(manhwa.pk)
 

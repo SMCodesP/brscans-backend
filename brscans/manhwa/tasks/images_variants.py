@@ -41,7 +41,7 @@ def merge_batch_original(urls: list, variant_id: int, folder: str):
 
 
 @task_sns
-def add_original_image_variant(id: int, url: str, folder: str):
+def add_original_image_variant(id: int, url: str, folder: str, translate: bool = True):
     variant = ImageVariants.objects.filter(id=id).first()
 
     if variant:
@@ -50,7 +50,8 @@ def add_original_image_variant(id: int, url: str, folder: str):
         image.content_type = "image/webp"
         variant.original.save(join(*folder, filename), image)
         new_url = variant.original.url
-        process_image_translate(variant.id, new_url, folder)
+        if translate:
+            process_image_translate(variant.id, new_url, folder)
 
     return {}
 
@@ -60,7 +61,7 @@ def process_image_translate(id, url: str, folder: str):
     variant = ImageVariants.objects.filter(id=id).first()
     if variant:
         filename = f"{uuid4().hex}.jpeg"
-        path = join(*folder, "transltaed", filename)
+        path = join(*folder, "translated", filename)
         presign = generate_presigned_url(
             join(settings.PUBLIC_MEDIA_LOCATION, path),
             {"type": "image/jpeg"},
