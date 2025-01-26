@@ -55,7 +55,8 @@ db.sqlite3
 static/
 media/*
 
-.env
 celerybeat-schedule
 
 credentials/*.json
+
+.env
