@@ -56,6 +56,7 @@ class Chapter(models.Model):
     manhwa = models.ForeignKey(
         Manhwa, on_delete=models.CASCADE, related_name="chapters", null=True
     )
+    quantity_pages = models.IntegerField(null=True)
 
     source = models.URLField(null=True, blank=True)
 
@@ -63,3 +64,4 @@ class Chapter(models.Model):
 class Page(models.Model):
     chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name="pages")
     images = models.OneToOneField(ImageVariants, on_delete=models.CASCADE, null=True)
+    quantity_merged = models.IntegerField(null=True)

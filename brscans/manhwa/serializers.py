@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from rest_framework import serializers
 
 from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
@@ -18,23 +19,51 @@ class PageSerializer(serializers.ModelSerializer):
 
 
 class SimpleChapterSerializer(serializers.ModelSerializer):
+    quantity_merged = serializers.SerializerMethodField()
+
+    def get_quantity_merged(self, obj):
+        return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
+
     class Meta:
         model = Chapter
-        fields = ("id", "title", "slug", "release_date")
+        fields = (
+            "id",
+            "title",
+            "slug",
+            "release_date",
+            "quantity_pages",
+            "quantity_merged",
+        )
 
 
 class ChapterSerializer(serializers.ModelSerializer):
     pages = PageSerializer(many=True)
+    quantity_merged = serializers.SerializerMethodField()
+
+    def get_quantity_merged(self, obj):
+        return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
 
     class Meta:
         model = Chapter
-        fields = ("id", "title", "slug", "release_date", "pages")
+        fields = (
+            "id",
+            "title",
+            "slug",
+            "release_date",
+            "quantity_pages",
+            "quantity_merged",
+            "pages",
+        )
 
 
 class ChapterNextPreviousSerializer(serializers.ModelSerializer):
     next = serializers.SerializerMethodField()
     previous = serializers.SerializerMethodField()
     pages = PageSerializer(many=True)
+    quantity_merged = serializers.SerializerMethodField()
+
+    def get_quantity_merged(self, obj):
+        return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
 
     def get_next(self, obj):
         next_chapter = (
@@ -58,7 +87,17 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Chapter
-        fields = ("id", "title", "slug", "release_date", "pages", "next", "previous")
+        fields = (
+            "id",
+            "title",
+            "slug",
+            "release_date",
+            "quantity_pages",
+            "quantity_merged",
+            "pages",
+            "next",
+            "previous",
+        )
 
 
 class ManhwaSerializer(serializers.ModelSerializer):
@@ -85,7 +124,7 @@ class ManhwaSerializer(serializers.ModelSerializer):
 
 class ManhwaDetailSerializer(serializers.ModelSerializer):
     thumbnail = VariantsSerializer()
-    chapters = ChapterSerializer(many=True)
+    chapters = SimpleChapterSerializer(many=True)
 
     class Meta:
         model = Manhwa

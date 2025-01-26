@@ -37,14 +37,14 @@ def download_images(urls):
 
 
 def images_height(images):
-    return [image.height for image in images]
+    return [{"height": image.height, "width": image.width} for image in images]
 
 
 # Função principal para processar URLs e retornar lista de ContentFile
 def batch_urls(urls):
     time = datetime.now()
     images = download_images(urls)
-    heights = images_height(images)
+    sizes = images_height(images)
     print(
         f"Levou {(datetime.now() - time).total_seconds():.2f} segundos para baixar as imagens."
     )
@@ -53,15 +53,26 @@ def batch_urls(urls):
     grouped_images = []
     current_group = []
     current_height = 0
+    current_width = None
 
-    for url, height in zip(urls, heights):
-        if current_height + height <= max_height:
-            current_group.append(url)
-            current_height += height
+    for url, size in zip(urls, sizes):
+        if current_width is None:
+            current_width = size.get("width")
+
+        if current_width == size.get("width"):
+            if current_height + size.get("height") <= max_height:
+                current_group.append(url)
+                current_height += size.get("height")
+            else:
+                grouped_images.append(current_group)
+                current_group = [url]
+                current_height = size.get("height")
+                current_width = size.get("width")
         else:
             grouped_images.append(current_group)
             current_group = [url]
-            current_height = height
+            current_height = size.get("height")
+            current_width = size.get("width")
 
     if current_group:
         grouped_images.append(current_group)

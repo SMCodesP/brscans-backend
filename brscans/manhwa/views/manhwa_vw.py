@@ -1,15 +1,21 @@
+from django.http import FileResponse
 from hashlib import sha256
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 
-from brscans.manhwa.models import ImageVariants, Manhwa
+from brscans.manhwa.models import Chapter, ImageVariants, Manhwa
 from brscans.manhwa.serializers import ManhwaDetailSerializer, ManhwaSerializer
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
+from brscans.manhwa.tasks.sync_chapter import sync_chapter
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
 from brscans.pagination import TotalPagination
+
+# from brscans.utils.anime4k import Anime4k
+from brscans.wrapper import sources
 from brscans.wrapper.sources.Generic import Generic
+from brscans.wrapper.sources.KingOfShojo import KingOfShojo
 
 
 class ManhwaViewSet(viewsets.ModelViewSet):
@@ -45,6 +51,42 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         serializer = ManhwaSerializer(manhwas, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["get"])
+    def count_fix_caps(self, request, pk=None):
+        chapters = Chapter.objects.filter(
+            (
+                Q(pages__isnull=True)
+                | Q(pages__images__isnull=True)
+                | Q(pages__images__translated__isnull=True)
+                | Q(pages__images__original__isnull=True)
+                | Q(pages__images__original="")
+                | Q(pages__images__translated="")
+            ),
+            manhwa=pk,
+        )
+
+        return Response({"count": chapters.count()})
+
+    @action(detail=True, methods=["get"])
+    def fix_caps(self, request, pk=None):
+        chapters = Chapter.objects.filter(
+            (
+                Q(pages__isnull=True)
+                | Q(pages__images__isnull=True)
+                | Q(pages__images__translated__isnull=True)
+                | Q(pages__images__original__isnull=True)
+                | Q(pages__images__original="")
+                | Q(pages__images__translated="")
+            ),
+            manhwa=pk,
+        )
+
+        for chapter in chapters:
+            chapter.pages.all().delete()
+            sync_chapter(chapter.pk, pk)
+
+        return Response({"message": f"Corrigindo {chapters.count()} capítulos."})
+
     @action(detail=False, methods=["get"])
     def download(self, request):
         link = request.query_params.get("link")
@@ -53,10 +95,13 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         manhwa = Manhwa.objects.filter(identifier=identifier).first()
 
         if manhwa:
+            manhwa.delete()
             serializer = self.serializer_class(manhwa)
             return Response(serializer.data)
 
-        result = Generic.info(link, False)
+        Source: Generic = sources.get_source_by_link(link)
+        result = Source.info(link, capthers=True)
+
         id = str(result.get("id")).encode("utf-8")
 
         manhwa = Manhwa.objects.create(
@@ -77,3 +122,11 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         sync_chapters(manhwa.pk)
 
         return Response(self.serializer_class(manhwa).data)
+
+    # @action(detail=False, methods=["get"])
+    # def anime4k(self, request):
+    #     image = request.query_params.get("image")
+    #     anime4k = Anime4k()
+    #     path = anime4k.upscale_remote_image(image)
+
+    #     return FileResponse(open(path, "rb"), content_type="image/png")

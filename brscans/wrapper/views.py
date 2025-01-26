@@ -8,7 +8,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.request import Request
 from brscans import settings
-from brscans.utils.anime4k import Anime4k
 
 from brscans.wrapper.sources.Nexo import Nexo
 from brscans.wrapper.sources.Cerise import Cerise
@@ -56,13 +55,3 @@ class WrapperViewSet(viewsets.ViewSet):
 
         gekkou = Gekkou()
         return Response(gekkou.pages(pk, cap, upscale == "true"))
-
-    @action(detail=False, methods=["get"])
-    def anime4k(self, request: Request):
-        image = request.query_params.get("image")
-        anime4k = Anime4k()
-        path = anime4k.upscale_remote_image(image)
-
-        path_relative = path.replace(settings.MEDIA_ROOT, "")
-
-        return HttpResponseRedirect(f"{settings.MEDIA_URL}{path_relative}")

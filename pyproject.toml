@@ -6,7 +6,7 @@ authors = ["Samuel Pereira da Silva <samuel.silva513@etec.sp.gov.br>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.12.1"
 django = "4.2.9"
 djangorestframework = "3.14.0"
 black = "23.12.1"
@@ -27,6 +27,8 @@ zappa = "^0.59.0"
 tldextract = "^5.1.2"
 replicate = "^0.28.0"
 django-debug-toolbar = "^4.4.6"
+pyanime4k = "2.2.7"
+setuptools = "^75.8.0"
 
 [build-system]
 requires = ["poetry-core"]

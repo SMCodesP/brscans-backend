@@ -19,9 +19,9 @@
             "S3_STATIC_BUCKET": "brscans-media",
             "S3_REGION": "sa-east-1"
         },
-        "timeout_seconds": 600,
+        "timeout_seconds": 900,
         "async_source": "sns",
         "async_resources": true,
-        "memory_size": 512
+        "memory_size": 1536
     }
 }

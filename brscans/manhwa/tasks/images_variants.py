@@ -16,10 +16,13 @@ from os.path import join
 @task_sns
 def merge_pages_original(urls: list, chapter: int, folder: str):
     batches = batch_urls(urls)
+
     for batch in batches:
         variants = ImageVariants.objects.create()
         variants.save()
-        page = Page.objects.create(chapter_id=chapter, images=variants)
+        page = Page.objects.create(
+            chapter_id=chapter, images=variants, quantity_merged=len(batch)
+        )
         page.save()
         merge_batch_original(batch, variants.pk, folder)
 
