@@ -8,7 +8,7 @@ from django.db.models import Q
 from brscans.manhwa.models import Chapter, ImageVariants, Manhwa
 from brscans.manhwa.serializers import ManhwaDetailSerializer, ManhwaSerializer
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
-from brscans.manhwa.tasks.sync_chapter import sync_chapter
+from brscans.manhwa.tasks.sync_chapter import sync_chapter, sync_chapter_fix
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
 from brscans.pagination import TotalPagination
 
@@ -86,6 +86,19 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             sync_chapter(chapter.pk, pk)
 
         return Response({"message": f"Corrigindo {chapters.count()} capítulos."})
+
+    @action(detail=True, methods=["get"])
+    def fix(self, request, pk=None):
+        manhwa = Manhwa.objects.get(pk=pk)
+
+        chapters = Chapter.objects.filter(manhwa=manhwa)
+
+        results = []
+
+        for chapter in chapters:
+            results.append(sync_chapter_fix(chapter.pk))
+
+        return Response(results)
 
     @action(detail=False, methods=["get"])
     def download(self, request):
