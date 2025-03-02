@@ -1,6 +1,9 @@
+from django.db.models.functions import Cast, Substr
+from django.forms import IntegerField
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models.expressions import RawSQL
 
 from brscans.manhwa.models import Chapter
 from brscans.manhwa.serializers import ChapterSerializer, SimpleChapterSerializer
@@ -15,7 +18,11 @@ class ManhwaChapterViewSet(viewsets.ModelViewSet):
     queryset = Chapter.objects.all()
 
     def get_queryset(self):
-        return Chapter.objects.filter(manhwa=self.kwargs["manhwa_pk"])
+        return (
+            Chapter.objects.filter(manhwa=self.kwargs["manhwa_pk"])
+            .annotate(slug_number=RawSQL("CAST(SUBSTRING(slug FROM 9) AS INTEGER)", []))
+            .order_by("slug_number")
+        )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = SimpleChapterSerializer

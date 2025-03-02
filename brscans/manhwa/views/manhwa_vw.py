@@ -3,7 +3,8 @@ from hashlib import sha256
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Prefetch
+from django.db.models.expressions import RawSQL
 
 from brscans.manhwa.models import Chapter, ImageVariants, Manhwa
 from brscans.manhwa.serializers import ManhwaDetailSerializer, ManhwaSerializer
@@ -31,7 +32,16 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         self.queryset = self.queryset.prefetch_related(
-            "chapters", "chapters__pages", "chapters__pages__images"
+            Prefetch(
+                "chapters",
+                queryset=Chapter.objects.all()
+                .annotate(
+                    slug_number=RawSQL("CAST(SUBSTRING(slug FROM 9) AS INTEGER)", [])
+                )
+                .order_by("slug_number"),
+            ),
+            "chapters__pages",
+            "chapters__pages__images",
         )
         self.serializer_class = ManhwaDetailSerializer
         return super().retrieve(request, *args, **kwargs)
@@ -108,7 +118,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         manhwa = Manhwa.objects.filter(identifier=identifier).first()
 
         if manhwa:
-            manhwa.delete()
+            sync_chapters(manhwa.pk)
             serializer = self.serializer_class(manhwa)
             return Response(serializer.data)
 

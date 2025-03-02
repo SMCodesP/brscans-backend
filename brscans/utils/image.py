@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from cloudscraper import CloudScraper
 import requests
 from PIL import Image
 from io import BytesIO
@@ -8,9 +9,14 @@ from django.core.files.base import ContentFile
 from brscans.wrapper.sources.Generic import Generic
 
 
+scraper = CloudScraper.create_scraper()
+
+
 # Função para baixar imagem a partir de uma URL
 def download_image(url):
-    response = Generic.scraper.get(url)
+    response = scraper.get(url)
+    if response.status_code != 200:
+        print(f"Erro ao baixar imagem: {url}")
     response.raise_for_status()
     return Image.open(BytesIO(response.content))
 
@@ -24,6 +30,7 @@ def merge_images(images):
     new_image = Image.new("RGB", (max_width, total_height))
     y_offset = 0
     for im in images:
+        print(f"Imagem: {im.size}")
         new_image.paste(im, (0, y_offset))
         y_offset += im.height
 
@@ -84,5 +91,5 @@ def process_merge_images(urls):
     images = download_images(urls)
     merged_image = merge_images(images)
     buffer = BytesIO()
-    merged_image.save(buffer, format="WEBP")
+    merged_image.convert("RGB").save(buffer, format="WEBP")
     return ContentFile(buffer.getvalue(), name="merged_image.webp")
