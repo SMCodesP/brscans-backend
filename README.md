@@ -17,3 +17,11 @@ O **Brscans Backend** é uma aplicação baseada em **Django** que realiza o scr
 - **AWS S3** para armazenamento de imagens
 - **AWS Lambda** para execução assíncrona
 - **Zappa** para deploy serverless
+<!-- 
+// "events": [
+//     {
+//         "function": "brscans.manhwa.tasks.sync_manhwas.sync_manhwas",
+//         "expression": "cron(0/30 * * * ? *)"
+//     }
+// ]
+-->

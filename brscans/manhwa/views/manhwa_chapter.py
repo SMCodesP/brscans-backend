@@ -20,7 +20,18 @@ class ManhwaChapterViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return (
             Chapter.objects.filter(manhwa=self.kwargs["manhwa_pk"])
-            .annotate(slug_number=RawSQL("CAST(SUBSTRING(slug FROM 9) AS INTEGER)", []))
+            .annotate(
+                slug_number=RawSQL(
+                    """
+                    CASE 
+                        WHEN SUBSTRING(slug FROM 9) ~ '^[0-9]+(\.[0-9]+)?$' 
+                        THEN CAST(SUBSTRING(slug FROM 9) AS FLOAT) 
+                        ELSE NULL 
+                    END
+                """,
+                    [],
+                )
+            )
             .order_by("slug_number")
         )
 

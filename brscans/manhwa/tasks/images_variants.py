@@ -69,13 +69,15 @@ def process_image_translate(id, url: str, folder: str):
             join(settings.PUBLIC_MEDIA_LOCATION, path),
             {"type": "image/jpeg"},
         )
-        httpx.post(
-            "https://smcodesp--brscans-translate.modal.run",
-            json={"presign": presign, "link": url},
-            timeout=None,
-        )
-        variant.translated.name = path
-        variant.save()
+
+        try:
+            httpx.post(
+                "https://smcodesp--brscans-translate.modal.run",
+                json={"presign": presign, "link": url},
+                timeout=0.0001,
+            )
+        except httpx.ReadTimeout:
+            pass
     else:
         print("Image variant not found.")
 

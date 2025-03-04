@@ -22,12 +22,6 @@
         "timeout_seconds": 900,
         "async_source": "sns",
         "async_resources": true,
-        "memory_size": 1536,
-        "events": [
-            {
-                "function": "brscans.manhwa.tasks.sync_manhwas.sync_manhwas",
-                "expression": "cron(0/30 * * * ? *)"
-            }
-        ]
+        "memory_size": 1536
     }
 }
