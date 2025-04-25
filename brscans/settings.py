@@ -13,10 +13,13 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+load_dotenv()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -157,7 +160,7 @@ if PRODUCTION:
 
     DEFAULT_FILE_STORAGE = "brscans.storage_backends.MediaStorage"
     MEDIA_URL = f"https://{CLOUDFRONT_DOMAIN}/media/"
-    PUBLIC_MEDIA_LOCATION = "media"
+    PUBLIC_MEDIA_LOCATION = "media/"
 else:
     STATIC_ROOT = os.path.join(BASE_DIR, "..", "static")
     STATIC_URL = "static/"

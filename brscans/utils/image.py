@@ -1,13 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from cloudscraper import CloudScraper
-import requests
-from PIL import Image
 from io import BytesIO
+
+from cloudscraper import CloudScraper
 from django.core.files.base import ContentFile
-
-from brscans.wrapper.sources.Generic import Generic
-
+from PIL import Image
 
 scraper = CloudScraper.create_scraper()
 

@@ -1,22 +1,25 @@
-from django.http import FileResponse
 from hashlib import sha256
+
+from django.db.models import Prefetch, Q
+from django.db.models.expressions import RawSQL
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q, Prefetch
-from django.db.models.expressions import RawSQL
 
 from brscans.manhwa.models import Chapter, ImageVariants, Manhwa
-from brscans.manhwa.serializers import ManhwaDetailSerializer, ManhwaSerializer
+from brscans.manhwa.serializers import (
+    ChapterSerializer,
+    ManhwaDetailSerializer,
+    ManhwaSerializer,
+)
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
-from brscans.manhwa.tasks.sync_chapter import sync_chapter, sync_chapter_fix
+from brscans.manhwa.tasks.sync_chapter import fix_pages, sync_chapter, sync_chapter_fix
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
 from brscans.pagination import TotalPagination
 
 # from brscans.utils.anime4k import Anime4k
 from brscans.wrapper import sources
 from brscans.wrapper.sources.Generic import Generic
-from brscans.wrapper.sources.KingOfShojo import KingOfShojo
 
 
 class ManhwaViewSet(viewsets.ModelViewSet):
@@ -36,7 +39,19 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 "chapters",
                 queryset=Chapter.objects.all()
                 .annotate(
-                    slug_number=RawSQL("CAST(SUBSTRING(slug FROM 9) AS INTEGER)", [])
+                    slug_number=RawSQL(
+                        """
+                        CASE 
+                            WHEN slug ~ '[0-9]+' 
+                            THEN CAST(
+                                (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
+                                AS INTEGER
+                            ) 
+                            ELSE NULL 
+                        END
+                        """,
+                        [],
+                    )
                 )
                 .order_by("slug_number"),
             ),
@@ -73,7 +88,10 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 | Q(pages__images__translated="")
             ),
             manhwa=pk,
-        )
+        ).distinct()
+
+        for chapter in chapters:
+            fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
 
@@ -89,13 +107,20 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 | Q(pages__images__translated="")
             ),
             manhwa=pk,
-        )
+        ).distinct()[:20]
 
         for chapter in chapters:
             chapter.pages.all().delete()
             sync_chapter(chapter.pk, pk)
 
-        return Response({"message": f"Corrigindo {chapters.count()} capítulos."})
+        serializer_data = ChapterSerializer(chapters, many=True).data
+
+        return Response(
+            {
+                "message": f"Corrigindo {chapters.count()} capítulos.",
+                "data": serializer_data,
+            }
+        )
 
     @action(detail=True, methods=["get"])
     def fix(self, request, pk=None):

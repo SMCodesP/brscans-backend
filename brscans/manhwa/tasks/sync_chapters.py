@@ -1,5 +1,4 @@
-import datetime
-from zappa.asynchronous import task_sns
+from zappa.asynchronous import task
 
 from brscans.manhwa.models import Chapter, Manhwa
 from brscans.manhwa.tasks.sync_chapter import sync_chapter
@@ -7,7 +6,7 @@ from brscans.wrapper import sources
 from brscans.wrapper.sources.Generic import Generic
 
 
-@task_sns
+@task
 def sync_chapters(manhwa_id: int):
     manhwa = Manhwa.objects.filter(id=manhwa_id).first()
     Source: Generic = sources.get_source_by_link(manhwa.source)
@@ -22,7 +21,7 @@ def sync_chapters(manhwa_id: int):
         if chapter_records == None:
             records.append(chapter)
 
-    for chapter in records[:20]:
+    for chapter in records:
         chapter_records = Chapter.objects.create(
             slug=chapter.get("id"),
             title=chapter.get("title"),
@@ -30,3 +29,5 @@ def sync_chapters(manhwa_id: int):
             source=chapter.get("url"),
         )
         sync_chapter(chapter_records.pk, manhwa_id)
+
+    return {"Message": "Chapters synced successfully."}

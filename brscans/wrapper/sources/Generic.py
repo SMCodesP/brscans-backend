@@ -1,10 +1,9 @@
-from copyreg import constructor
 import re
-from cloudscraper import CloudScraper
-import requests
-from unidecode import unidecode
+
 import httpx
-from bs4 import BeautifulSoup, ResultSet, Tag, NavigableString, Comment
+from bs4 import BeautifulSoup, ResultSet, Tag
+from cloudscraper import CloudScraper
+from unidecode import unidecode
 
 
 class Generic:
@@ -67,7 +66,7 @@ class Generic:
 
     @staticmethod
     def chapters(url):
-        response = Generic.scraper.post(url + f"/ajax/chapters")
+        response = Generic.scraper.post(url + "/ajax/chapters")
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")

@@ -1,10 +1,7 @@
-from copyreg import constructor
-import re
-from cloudscraper import CloudScraper
-import requests
-from unidecode import unidecode
 import httpx
-from bs4 import BeautifulSoup, ResultSet, Tag, NavigableString, Comment
+from bs4 import BeautifulSoup, ResultSet, Tag
+from cloudscraper import CloudScraper
+from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
 
@@ -20,7 +17,7 @@ class ManhuaRead(Generic):
 
     @staticmethod
     def chapters(url):
-        response = ManhuaRead.scraper.post(url + f"ajax/chapters/")
+        response = ManhuaRead.scraper.post(url + "ajax/chapters/")
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")

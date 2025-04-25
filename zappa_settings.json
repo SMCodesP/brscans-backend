@@ -7,7 +7,8 @@
             "dateutil",
             "botocore",
             "s3transfer",
-            "concurrent"
+            "concurrent",
+            ".env"
         ],
         "profile_name": "brscans",
         "project_name": "brscans-backend",
@@ -19,9 +20,8 @@
             "S3_STATIC_BUCKET": "brscans-media",
             "S3_REGION": "sa-east-1"
         },
-        "timeout_seconds": 900,
-        "async_source": "sns",
-        "async_resources": true,
-        "memory_size": 1536
+        "timeout_seconds": 30,
+        "memory_size": 1536,
+        "lambda_concurrency": 10
     }
 }

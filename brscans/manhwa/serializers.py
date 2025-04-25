@@ -10,6 +10,14 @@ class VariantsSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class VariantsUpdateSerializer(serializers.ModelSerializer):
+    translated = serializers.CharField(required=False, max_length=255)
+
+    class Meta:
+        model = ImageVariants
+        fields = "__all__"
+
+
 class PageSerializer(serializers.ModelSerializer):
     images = VariantsSerializer()
 
