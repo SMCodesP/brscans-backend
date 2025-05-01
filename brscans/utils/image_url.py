@@ -1,9 +1,8 @@
 from io import BytesIO
-from PIL import Image
-from django.core.files.base import ContentFile
-import httpx
-import requests
+
 import cloudscraper
+from django.core.files.base import ContentFile
+from PIL import Image
 
 scraper = cloudscraper.create_scraper()
 

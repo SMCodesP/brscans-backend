@@ -21,7 +21,7 @@
             "S3_REGION": "sa-east-1"
         },
         "timeout_seconds": 30,
-        "memory_size": 1536,
+        "memory_size": 3008,
         "lambda_concurrency": 10
     }
 }

@@ -76,6 +76,18 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         serializer = ManhwaSerializer(manhwas, many=True)
         return Response(serializer.data)
 
+    # @action(detail=True, methods=["get"])
+    # def fix_original_images(self, request, pk=None):
+    #     chapters = Chapter.objects.filter(
+    #         pages__images__original__isnull=True,
+    #         pages__images__original="",
+    #     )
+
+    #     # for chapter in chapters:
+    #     #     fix_pages(chapter.pk)
+
+    #     return Response({"count": chapters.count()})
+
     @action(detail=True, methods=["get"])
     def count_fix_caps(self, request, pk=None):
         chapters = Chapter.objects.filter(
@@ -83,12 +95,13 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 Q(pages__isnull=True)
                 | Q(pages__images__isnull=True)
                 | Q(pages__images__translated__isnull=True)
-                | Q(pages__images__original__isnull=True)
-                | Q(pages__images__original="")
                 | Q(pages__images__translated="")
             ),
             manhwa=pk,
+            pages__images__original__isnull=False,
         ).distinct()
+
+        print(chapters.count())
 
         for chapter in chapters:
             fix_pages(chapter.pk)

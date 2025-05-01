@@ -27,7 +27,6 @@ def merge_images(images):
     new_image = Image.new("RGB", (max_width, total_height))
     y_offset = 0
     for im in images:
-        print(f"Imagem: {im.size}")
         new_image.paste(im, (0, y_offset))
         y_offset += im.height
 
@@ -45,9 +44,8 @@ def images_height(images):
 
 
 # Função principal para processar URLs e retornar lista de ContentFile
-def batch_urls(urls):
+def batch_urls(images):
     time = datetime.now()
-    images = download_images(urls)
     sizes = images_height(images)
     print(
         f"Levou {(datetime.now() - time).total_seconds():.2f} segundos para baixar as imagens."
@@ -59,22 +57,22 @@ def batch_urls(urls):
     current_height = 0
     current_width = None
 
-    for url, size in zip(urls, sizes):
+    for image, size in zip(images, sizes):
         if current_width is None:
             current_width = size.get("width")
 
         if current_width == size.get("width"):
             if current_height + size.get("height") <= max_height:
-                current_group.append(url)
+                current_group.append(image)
                 current_height += size.get("height")
             else:
                 grouped_images.append(current_group)
-                current_group = [url]
+                current_group = [image]
                 current_height = size.get("height")
                 current_width = size.get("width")
         else:
             grouped_images.append(current_group)
-            current_group = [url]
+            current_group = [image]
             current_height = size.get("height")
             current_width = size.get("width")
 
@@ -84,9 +82,35 @@ def batch_urls(urls):
     return grouped_images
 
 
-def process_merge_images(urls):
-    images = download_images(urls)
+def process_merge_images(images):
     merged_image = merge_images(images)
     buffer = BytesIO()
     merged_image.convert("RGB").save(buffer, format="WEBP")
     return ContentFile(buffer.getvalue(), name="merged_image.webp")
+
+
+def split_large_image(image):
+    max_height = 16383
+
+    if image.height <= max_height:
+        return [image]
+
+    num_parts = (image.height + max_height - 1) // max_height
+    parts = []
+
+    for i in range(num_parts):
+        top = i * max_height
+        bottom = min((i + 1) * max_height, image.height)
+
+        part = image.crop((0, top, image.width, bottom))
+        parts.append(part)
+
+    return parts
+
+
+def batch_images_with_split(images):
+    all_images = []
+    for img in images:
+        all_images.extend(split_large_image(img))
+
+    return batch_urls(all_images)

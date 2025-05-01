@@ -1,15 +1,18 @@
 from brscans.wrapper.sources.Generic import Generic
 from brscans.wrapper.sources.KingOfShojo import KingOfShojo
+from brscans.wrapper.sources.Mangadass import Mangadass
 from brscans.wrapper.sources.ManhuaRead import ManhuaRead
 from brscans.wrapper.sources.Manhuaus import Manhuaus
+from brscans.wrapper.sources.Manhwahub import Manhwahub
 from brscans.wrapper.sources.RizzFables import RizzFables
-
 
 sources = {
     "kingofshojo.com": KingOfShojo,
     "manhuaread.com": ManhuaRead,
     "manhuaus.org": Manhuaus,
     "rizzfables.com": RizzFables,
+    "manhwahub.net": Manhwahub,
+    "mangadass.com": Mangadass,
     "other": Generic,
 }
 

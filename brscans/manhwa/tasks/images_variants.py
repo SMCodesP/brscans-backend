@@ -9,16 +9,23 @@ from zappa.asynchronous import task
 
 from brscans.manhwa.models import ImageVariants, Page
 from brscans.utils.generate_presigned_url import generate_presigned_url
-from brscans.utils.image import batch_urls, process_merge_images
+from brscans.utils.image import (
+    batch_images_with_split,
+    download_images,
+    process_merge_images,
+)
 from brscans.utils.image_url import image_url
 from brscans.utils.resize_image import resize_image
 
 
 @task
 def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = None):
-    batches = batch_urls(urls)
+    images = download_images(urls)
+    batches = batch_images_with_split(images)
 
     for batch in batches:
+        if len(batch) == 0:
+            continue
         variants = ImageVariants.objects.create()
         variants.save()
         page = Page.objects.create(
@@ -30,9 +37,10 @@ def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = N
     return {"Message": "Created batches merged successfully."}
 
 
-@task
-def merge_batch_original(urls: list, variant_id: int, folder: str, main_id: str = None):
-    image = process_merge_images(urls)
+def merge_batch_original(
+    images: list, variant_id: int, folder: str, main_id: str = None
+):
+    image = process_merge_images(images)
     filename = f"{uuid4().hex}.webp"
     path = join(*folder, filename)
 
