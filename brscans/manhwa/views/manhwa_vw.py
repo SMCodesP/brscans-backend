@@ -33,6 +33,10 @@ class ManhwaViewSet(viewsets.ModelViewSet):
     permission_classes = []
     pagination_class = TotalPagination
 
+    def list(self, request, *args, **kwargs):
+        self.queryset = self.queryset.filter(is_nsfw=False)
+        return super().list(request, *args, **kwargs)
+
     def retrieve(self, request, *args, **kwargs):
         self.queryset = self.queryset.prefetch_related(
             Prefetch(
