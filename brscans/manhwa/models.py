@@ -44,7 +44,7 @@ class Manhwa(models.Model):
 
     is_nsfw = models.BooleanField(default=False)
 
-    genres = models.ManyToManyField(Genre, related_name="manhwas")
+    genres = models.ManyToManyField(Genre, related_name="manhwas", blank=True)
 
     def __str__(self):
         return self.title

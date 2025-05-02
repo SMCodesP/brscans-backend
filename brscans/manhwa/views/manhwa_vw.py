@@ -105,8 +105,6 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             pages__images__original__isnull=False,
         ).distinct()
 
-        print(chapters.count())
-
         for chapter in chapters:
             fix_pages(chapter.pk)
 

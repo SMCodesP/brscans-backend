@@ -115,6 +115,7 @@ class ManhwaSerializer(serializers.ModelSerializer):
         model = Manhwa
         fields = (
             "id",
+            "is_nsfw",
             "thumbnail",
             "title",
             "author",
@@ -138,6 +139,7 @@ class ManhwaDetailSerializer(serializers.ModelSerializer):
         model = Manhwa
         fields = (
             "id",
+            "is_nsfw",
             "thumbnail",
             "title",
             "author",

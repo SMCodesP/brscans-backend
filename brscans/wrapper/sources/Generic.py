@@ -39,14 +39,14 @@ class Generic:
 
     @staticmethod
     def info(url, capthers: bool = False):
-        response = Generic.scraper.post(url)
+        response = Generic.scraper.get(url)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
 
         id = soup.find("meta", property="og:url").get("content").split("/")[-2]
         title = soup.find("div", class_="post-title").find("h1").get_text().strip()
-        summary = soup.find("div", class_="summary__content").get_text().strip()
+        summary = soup.find("div", class_="summary__content")
         image = soup.find("div", class_="summary_image").find("img")
         image = image.get("data-src") or image.get("src")
         image = re.sub(r"-\d+x\d+(?=\.\w{3,4}$)", "", image)
@@ -55,7 +55,9 @@ class Generic:
             "id": id,
             "url": url,
             "title": unidecode(title),
-            "summary": summary,
+            "summary": summary.get_text().strip()
+            if summary
+            else "Resumo não encontrado",
             "image": image,
         }
 
@@ -76,7 +78,8 @@ class Generic:
         chapters = []
 
         for cape in capes:
-            title = cape.find("a").get_text().strip()
+            link = cape.find("a")
+            title = link.get_text().strip()
             url = cape.find("a").get("href")
             chapter = {
                 "id": url.split("/")[-2],

@@ -58,7 +58,6 @@ def fix_pages(chapter_id: dict):
     )
 
     for variant in variants:
-        print(chapter_id, variant.pk)
         process_image_translate(
             variant.pk,
             variant.original.url,
