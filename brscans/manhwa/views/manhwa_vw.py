@@ -45,15 +45,15 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 .annotate(
                     slug_number=RawSQL(
                         """
-                        CASE 
-                            WHEN slug ~ '[0-9]+' 
-                            THEN CAST(
-                                (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
-                                AS INTEGER
-                            ) 
-                            ELSE NULL 
-                        END
-                        """,
+                    CASE 
+                        WHEN slug ~ '[0-9]+' 
+                        THEN CAST(
+                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
+                            AS INTEGER
+                        ) 
+                        ELSE NULL 
+                    END
+                    """,
                         [],
                     )
                 )
@@ -159,6 +159,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
         if manhwa:
             sync_chapters(manhwa.pk)
+
             serializer = self.serializer_class(manhwa)
             return Response(serializer.data)
 

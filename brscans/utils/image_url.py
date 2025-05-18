@@ -8,6 +8,7 @@ scraper = cloudscraper.create_scraper()
 
 
 def image_url(url: str, filename):
+    print("url", url)
     response = scraper.get(url)
     image = Image.open(BytesIO(response.content))
     buffer = BytesIO()

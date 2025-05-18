@@ -1,4 +1,5 @@
 from django.db.models import Sum
+from django.db.models.expressions import RawSQL
 from rest_framework import serializers
 
 from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
@@ -73,10 +74,41 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
     def get_quantity_merged(self, obj):
         return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
 
+    def get_slug_number(self, slug):
+        """Extrai o primeiro número do slug como inteiro."""
+        import re
+
+        match = re.search(r"\d+", slug)
+        if match:
+            return int(match.group())
+        return None
+
     def get_next(self, obj):
+        # Calcula o slug_number do capítulo atual
+        current_slug_number = self.get_slug_number(obj.slug)
+        if current_slug_number is None:
+            return None
+
+        # Busca o próximo capítulo com slug_number maior que o atual
         next_chapter = (
-            Chapter.objects.filter(manhwa=obj.manhwa, id__gt=obj.id)
-            .order_by("id")
+            Chapter.objects.filter(manhwa=obj.manhwa)
+            .annotate(
+                slug_number=RawSQL(
+                    """
+                    CASE 
+                        WHEN slug ~ '[0-9]+' 
+                        THEN CAST(
+                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
+                            AS INTEGER
+                        ) 
+                        ELSE NULL 
+                    END
+                    """,
+                    [],
+                )
+            )
+            .filter(slug_number__gt=current_slug_number)
+            .order_by("slug_number")
             .first()
         )
         if next_chapter:
@@ -86,7 +118,22 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
     def get_previous(self, obj):
         previous_chapter = (
             Chapter.objects.filter(manhwa=obj.manhwa, id__lt=obj.id)
-            .order_by("-id")
+            .annotate(
+                slug_number=RawSQL(
+                    """
+                    CASE 
+                        WHEN slug ~ '[0-9]+' 
+                        THEN CAST(
+                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
+                            AS INTEGER
+                        ) 
+                        ELSE NULL 
+                    END
+                    """,
+                    [],
+                )
+            )
+            .order_by("-slug_number")
             .first()
         )
         if previous_chapter:

@@ -20,11 +20,8 @@ from brscans.utils.resize_image import resize_image
 
 @task
 def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = None):
-    print(urls)
     images = download_images(urls)
-    print(images)
     batches = batch_images_with_split(images)
-    print(batches)
 
     for batch in batches:
         if len(batch) == 0:

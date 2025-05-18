@@ -1,9 +1,11 @@
+from brscans.wrapper.sources.FlowerManga import FlowerManga
 from brscans.wrapper.sources.Generic import Generic
 from brscans.wrapper.sources.KingOfShojo import KingOfShojo
 from brscans.wrapper.sources.Mangadass import Mangadass
 from brscans.wrapper.sources.ManhuaRead import ManhuaRead
 from brscans.wrapper.sources.Manhuaus import Manhuaus
 from brscans.wrapper.sources.Manhwahub import Manhwahub
+from brscans.wrapper.sources.Neroxus import Neroxus
 from brscans.wrapper.sources.RizzFables import RizzFables
 
 sources = {
@@ -13,6 +15,8 @@ sources = {
     "rizzfables.com": RizzFables,
     "manhwahub.net": Manhwahub,
     "mangadass.com": Mangadass,
+    "flowermanga.net": FlowerManga,
+    "neroxus.com.br": Neroxus,
     "other": Generic,
 }
 

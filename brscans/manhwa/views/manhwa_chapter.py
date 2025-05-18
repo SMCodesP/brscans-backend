@@ -19,7 +19,7 @@ class ManhwaChapterViewSet(viewsets.ModelViewSet):
             Chapter.objects.filter(manhwa=self.kwargs["manhwa_pk"])
             .annotate(
                 slug_number=RawSQL(
-                    r"""
+                    """
                     CASE 
                         WHEN slug ~ '[0-9]+' 
                         THEN CAST(

@@ -7,6 +7,7 @@ class ImageVariants(models.Model):
     medium = models.ImageField(null=True)
     original = models.ImageField(null=True)
     translated = models.ImageField(null=True)
+    raw = models.ImageField(null=True)
 
     def save(self, *args, **kwargs):
         if self.translated and self.translated.name.startswith(

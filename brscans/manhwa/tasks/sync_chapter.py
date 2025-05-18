@@ -19,6 +19,7 @@ def sync_chapter(chapter_id: dict, manhwa_id: int):
     chapter = Source.chapter(chapter_records.source)
     chapter_records.quantity_pages = len(chapter["pages"])
     chapter_records.save()
+    print(chapter["pages"])
 
     merge_pages_original(
         chapter["pages"],

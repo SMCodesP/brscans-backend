@@ -72,6 +72,7 @@ class Generic:
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
+        print(soup.prettify())
 
         capes: ResultSet[Tag] = soup.find_all("li", class_="wp-manga-chapter")
 

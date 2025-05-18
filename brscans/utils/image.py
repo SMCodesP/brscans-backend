@@ -11,6 +11,7 @@ scraper = CloudScraper.create_scraper()
 
 # Função para baixar imagem a partir de uma URL
 def download_image(url):
+    print("donwload_image url", url)
     response = scraper.get(url)
     if response.status_code != 200:
         print(f"Erro ao baixar imagem: {url}")
@@ -47,9 +48,6 @@ def images_height(images):
 def batch_urls(images):
     time = datetime.now()
     sizes = images_height(images)
-    print(
-        f"Levou {(datetime.now() - time).total_seconds():.2f} segundos para baixar as imagens."
-    )
 
     max_height = 16383
     grouped_images = []
@@ -79,6 +77,9 @@ def batch_urls(images):
     if current_group:
         grouped_images.append(current_group)
 
+    print(
+        f"Levou {(datetime.now() - time).total_seconds():.2f} segundos para baixar as imagens."
+    )
     return grouped_images
 
 
