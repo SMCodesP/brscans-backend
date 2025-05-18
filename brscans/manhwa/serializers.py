@@ -13,6 +13,7 @@ class VariantsSerializer(serializers.ModelSerializer):
 
 class VariantsUpdateSerializer(serializers.ModelSerializer):
     translated = serializers.CharField(required=False, max_length=255)
+    raw = serializers.CharField(required=False, max_length=255)
 
     class Meta:
         model = ImageVariants

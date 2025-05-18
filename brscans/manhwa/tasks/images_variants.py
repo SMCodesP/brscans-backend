@@ -73,7 +73,7 @@ def add_original_image_variant(id: int, url: str, folder: str, translate: bool =
 @task
 def process_image_translate(id, url: str, folder: str, main_id: str = None):
     filename = f"{uuid4().hex}.jpeg"
-    path = join(*folder, "translated", filename)
+    path = join(*folder, "raw", filename)
     presign = generate_presigned_url(
         join(settings.PUBLIC_MEDIA_LOCATION, path),
         {"type": "image/jpeg"},
@@ -87,6 +87,7 @@ def process_image_translate(id, url: str, folder: str, main_id: str = None):
                 "image_id": id,
                 "context": join("contexts", str(main_id), "context.json"),
                 "path": path,
+                "folder": join(*folder),
             },
             timeout=1,
         )
