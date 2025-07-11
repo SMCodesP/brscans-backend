@@ -59,7 +59,7 @@ class Mangadass(Generic):
             title = cape.find("a").get_text().strip()
             chapter_url = "https://mangadass.com" + cape.find("a").get("href")
             chapter = {
-                "id": chapter_url.split("/")[-2],
+                "id": chapter_url.split("/")[-1],
                 "title": unidecode(title),
                 "url": chapter_url,
                 "release_date": cape.find("span", class_="chapter-time")

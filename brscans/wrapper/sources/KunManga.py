@@ -6,21 +6,22 @@ from unidecode import unidecode
 from brscans.wrapper.sources.Generic import Generic
 
 
-class ManhuaRead(Generic):
+class KunManga(Generic):
     scraper = CloudScraper.create_scraper()
 
     def __init__(self, url, headers=None) -> None:
         self.headers = headers
         self.url = url
         self.client = httpx.Client(timeout=None)
-        self.name = "ManhuaRead"
+        self.name = "KunManga"
 
     @staticmethod
     def chapters(url):
-        response = ManhuaRead.scraper.post(url + "ajax/chapters/")
+        response = KunManga.scraper.post(url)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
+        print(soup.prettify())
 
         capes: ResultSet[Tag] = soup.find("ul", class_="version-chap").find_all(
             "li", class_="wp-manga-chapter"

@@ -19,7 +19,6 @@ def sync_chapter(chapter_id: dict, manhwa_id: int):
     chapter = Source.chapter(chapter_records.source)
     chapter_records.quantity_pages = len(chapter["pages"])
     chapter_records.save()
-    print(chapter["pages"])
 
     merge_pages_original(
         chapter["pages"],
@@ -55,7 +54,9 @@ def fix_pages(chapter_id: dict):
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
 
     variants = ImageVariants.objects.filter(
-        Q(translated__isnull=True) | Q(translated=""), page__chapter=chapter_records
+        Q(translated__isnull=True) | Q(translated=""),
+        page__chapter=chapter_records,
+        original__isnull=False,
     )
 
     for variant in variants:

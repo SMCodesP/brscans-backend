@@ -109,17 +109,27 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
+    
+    @action(detail=True, methods=["get"])
+    def sync(self, request, pk=None):
+        manhwa = Manhwa.objects.get(pk=pk)
+        sync_chapters(manhwa.pk)
+        serializer = self.serializer_class(manhwa)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=["get"])
+    def delete_chapter(self, request, pk=None):
+        manhwa = Manhwa.objects.get(pk=pk)
+        chapters = Chapter.objects.filter(manhwa=manhwa)
+        chapters.delete()
+        return Response({"message": "Chapter deleted successfully."})
 
     @action(detail=True, methods=["get"])
     def fix_caps(self, request, pk=None):
         chapters = Chapter.objects.filter(
             (
-                Q(pages__isnull=True)
-                | Q(pages__images__isnull=True)
-                | Q(pages__images__translated__isnull=True)
-                | Q(pages__images__original__isnull=True)
+                Q(pages__images__original__isnull=True)
                 | Q(pages__images__original="")
-                | Q(pages__images__translated="")
             ),
             manhwa=pk,
         ).distinct()[:20]
@@ -146,7 +156,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         results = []
 
         for chapter in chapters:
-            results.append(sync_chapter_fix(chapter.pk))
+            results.append(sync_chapter(chapter.pk, pk))
 
         return Response(results)
 

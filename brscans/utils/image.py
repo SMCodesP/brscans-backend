@@ -11,12 +11,17 @@ scraper = CloudScraper.create_scraper()
 
 # Função para baixar imagem a partir de uma URL
 def download_image(url):
-    print("donwload_image url", url)
-    response = scraper.get(url)
-    if response.status_code != 200:
+    try:
+        print("donwload_image url", url)
+        response = scraper.get(url)
+        if response.status_code != 200:
+            print(f"Erro ao baixar imagem: {url}")
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content))
+    except Exception as e:
         print(f"Erro ao baixar imagem: {url}")
-    response.raise_for_status()
-    return Image.open(BytesIO(response.content))
+        print(e)
+        return None
 
 
 # Função para fazer merge vertical de imagens
@@ -37,10 +42,12 @@ def merge_images(images):
 def download_images(urls):
     with ThreadPoolExecutor() as executor:
         images = list(executor.map(download_image, urls))
+        images = [img for img in images if img is not None]
     return images
 
 
 def images_height(images):
+    print("images_height", images)
     return [{"height": image.height, "width": image.width} for image in images]
 
 
