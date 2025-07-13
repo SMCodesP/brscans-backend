@@ -60,9 +60,10 @@ def fix_pages(chapter_id: dict):
     )
 
     for variant in variants:
-        process_image_translate(
-            variant.pk,
-            variant.original.url,
-            ["chapters", str(chapter_records.pk)],
-            chapter_records.manhwa.pk,
-        )
+        if variant.original:
+            process_image_translate(
+                variant.pk,
+                variant.original.url,
+                ["chapters", str(chapter_records.pk)],
+                chapter_records.manhwa.pk,
+            )
