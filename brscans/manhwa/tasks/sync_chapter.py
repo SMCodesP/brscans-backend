@@ -50,6 +50,7 @@ def sync_chapter_fix(chapter_id: dict):
     }
 
 
+@task
 def fix_pages(chapter_id: dict):
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
 

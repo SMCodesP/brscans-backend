@@ -22,7 +22,7 @@ def sync_chapters(manhwa_id: int):
         if chapter_records == None:
             records.append(chapter)
 
-    for chapter in records:
+    for chapter in records[:20]:
         chapter_records = Chapter.objects.create(
             slug=chapter.get("id"),
             title=chapter.get("title"),

@@ -6,7 +6,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from brscans.manhwa.models import Chapter, ImageVariants, Manhwa
+from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
 from brscans.manhwa.serializers import (
     ChapterSerializer,
     ManhwaDetailSerializer,
@@ -105,10 +105,33 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             pages__images__original__isnull=False,
         ).distinct()
 
-        for chapter in chapters:
+        for chapter in chapters[:20]:
             fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
+    
+    @action(detail=True, methods=["get"])
+    def count_pages_original(self, request, pk=None):
+        page = Page.objects.filter(chapter__manhwa=pk).filter(
+            (
+                Q(images__original__isnull=True)
+                | Q(images__original="")
+            ),
+        )
+
+        return Response({"count": page.count()})
+    
+    @action(detail=True, methods=["get"])
+    def count_pages_to_fix(self, request, pk=None):
+        page = Page.objects.filter(
+            (
+                Q(images__isnull=True)
+                | Q(images__translated__isnull=True)
+                | Q(images__translated="")
+            ),
+        )
+
+        return Response({"count": page.count()})
     
     @action(detail=True, methods=["get"])
     def sync(self, request, pk=None):

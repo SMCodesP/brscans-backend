@@ -80,7 +80,7 @@ def process_image_translate(id, url: str, folder: str, main_id: str = None):
     )
     try:
         httpx.post(
-            "https://smcodesp--brscans-translate.modal.run",
+            settings.TRANSLATOR_URL,
             json={
                 "presign": presign,
                 "link": url,
