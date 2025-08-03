@@ -13,7 +13,7 @@ from brscans.manhwa.serializers import (
     ManhwaSerializer,
 )
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
-from brscans.manhwa.tasks.sync_chapter import fix_pages, sync_chapter, sync_chapter_fix
+from brscans.manhwa.tasks.sync_chapter import fix_pages, sync_chapter, sync_chapter_fix, sync_missing_original_pages
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
 from brscans.pagination import TotalPagination
 
@@ -79,18 +79,6 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
         serializer = ManhwaSerializer(manhwas, many=True)
         return Response(serializer.data)
-
-    # @action(detail=True, methods=["get"])
-    # def fix_original_images(self, request, pk=None):
-    #     chapters = Chapter.objects.filter(
-    #         pages__images__original__isnull=True,
-    #         pages__images__original="",
-    #     )
-
-    #     # for chapter in chapters:
-    #     #     fix_pages(chapter.pk)
-
-    #     return Response({"count": chapters.count()})
 
     @action(detail=True, methods=["get"])
     def count_fix_caps(self, request, pk=None):
@@ -169,6 +157,86 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 "data": serializer_data,
             }
         )
+
+    @action(detail=True, methods=["get"])
+    def sync_missing_pages(self, request, pk=None):
+        """
+        Sincroniza páginas sem variant original.
+        Faz o fetch novamente do capítulo e processa apenas as páginas faltantes.
+        """
+        # Buscar capítulos com páginas sem original
+        chapters = Chapter.objects.filter(
+            manhwa=pk,
+            pages__images__isnull=False
+        ).filter(
+            Q(pages__images__original__isnull=True) | Q(pages__images__original="")
+        ).distinct()
+        
+        # Limitar para processar em lotes
+        limit = int(request.GET.get('limit', 10))
+        chapters = chapters[:limit]
+        
+        results = []
+        for chapter in chapters:
+            sync_missing_original_pages(chapter.pk, pk)
+            results.append({
+                "chapter_id": chapter.pk,
+                "chapter_title": chapter.title,
+            })
+        
+        return Response({
+            "message": f"Sincronizando páginas faltantes de {chapters.count()} capítulos",
+            "total_chapters": chapters.count(),
+            "results": results
+        })
+
+    @action(detail=True, methods=["get"])
+    def count_missing_original_pages(self, request, pk=None):
+        """
+        Conta quantas páginas estão sem variant original.
+        """
+        # Contar páginas sem original neste manhwa
+        pages_without_original = Page.objects.filter(
+            chapter__manhwa=pk
+        ).filter(
+            Q(images__original__isnull=True) | Q(images__original="")
+        ).count()
+        
+        # Contar capítulos afetados
+        chapters_affected = Chapter.objects.filter(
+            manhwa=pk,
+            pages__images__isnull=False
+        ).filter(
+            Q(pages__images__original__isnull=True) | Q(pages__images__original="")
+        ).distinct().count()
+        
+        # Detalhes por capítulo (primeiros 10)
+        chapter_details = []
+        chapters = Chapter.objects.filter(
+            manhwa=pk,
+            pages__images__isnull=False
+        ).filter(
+            Q(pages__images__original__isnull=True) | Q(pages__images__original="")
+        ).distinct()[:10]
+        
+        for chapter in chapters:
+            pages_missing = Page.objects.filter(
+                chapter=chapter
+            ).filter(
+                Q(images__original__isnull=True) | Q(images__original="")
+            ).count()
+            
+            chapter_details.append({
+                "chapter_id": chapter.pk,
+                "chapter_title": chapter.title,
+                "pages_without_original": pages_missing
+            })
+        
+        return Response({
+            "total_pages_without_original": pages_without_original,
+            "total_chapters_affected": chapters_affected,
+            "sample_chapters": chapter_details
+        })
 
     @action(detail=True, methods=["get"])
     def fix(self, request, pk=None):
