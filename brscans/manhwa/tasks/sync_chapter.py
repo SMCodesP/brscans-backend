@@ -17,7 +17,7 @@ def sync_chapter(chapter_id: dict, manhwa_id: int):
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
     # manhwa = chapter_records.manhwa
     Source: Generic = get_source_by_link(chapter_records.source)
-    chapter = Source.chapter(chapter_records.source)
+    chapter = Source.chapter(chapter_records)
     chapter_records.quantity_pages = len(chapter["pages"])
     chapter_records.save()
 

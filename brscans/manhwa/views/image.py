@@ -9,6 +9,8 @@ class ImageVariantViewSet(viewsets.ModelViewSet):
     serializer_class = VariantsSerializer
     queryset = ImageVariants.objects.all()
     pagination_class = TotalPagination
+    authentication_classes = []
+    permission_classes = []
 
     def partial_update(self, request, *args, **kwargs):
         self.serializer_class = VariantsUpdateSerializer

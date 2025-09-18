@@ -17,7 +17,7 @@ requests = "^2.32.3"
 django-cors-headers = "^4.4.0"
 whitenoise = "^6.7.0"
 gunicorn = "^22.0.0"
-cloudscraper = "^1.2.71"
+cloudscraper = { git = "https://github.com/VeNoMouS/cloudscraper.git", rev = "master" }
 drf-nested-routers = "^0.94.1"
 pillow = "^10.4.0"
 xmltodict = "^0.13.0"
@@ -31,6 +31,8 @@ pyanime4k = "2.2.7"
 setuptools = "^75.8.0"
 load-dotenv = "^0.1.0"
 python-dotenv = "^1.0.1"
+drf-spectacular = "^0.28.0"
+django-filter = "^25.1"
 
 [build-system]
 requires = ["poetry-core"]

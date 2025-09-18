@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from os.path import join
 from uuid import uuid4
@@ -18,23 +19,39 @@ from brscans.utils.image_url import image_url
 from brscans.utils.resize_image import resize_image
 
 
+
 @task
 def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = None):
     images = download_images(urls)
     batches = batch_images_with_split(images)
 
-    for batch in batches:
+    variants = []
+
+    # for batch in batches:
+    for batch, idx in zip(batches, range(len(batches))):
         if len(batch) == 0:
+            print("Empty batch, skipping...")
             continue
-        variants = ImageVariants.objects.create()
-        variants.save()
-        page = Page.objects.create(
-            chapter_id=chapter, images=variants, quantity_merged=len(batch)
+        variant = ImageVariants.objects.create()
+        Page.objects.create(
+            chapter_id=chapter, images=variant, quantity_merged=len(batch), order=idx
         )
-        page.save()
-        merge_batch_original(batch, variants.pk, folder, main_id)
+        variants.append({
+            "variant": variant.pk,
+            "batch": batch,
+            "folder": folder,
+            "main_id": main_id
+        })
+
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        executor.map(proccess_merged, variants)
 
     return {"Message": "Created batches merged successfully."}
+
+def proccess_merged(data):
+    print("Processing batch for variant", data.get("variant"))
+    return merge_batch_original(data.get("batch"), data.get("variant"), data.get("folder"), data.get("main_id"))
+
 
 
 def merge_batch_original(

@@ -1,13 +1,17 @@
 import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag
-from cloudscraper import CloudScraper
+import cloudscraper
 from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
 
 
 class KunManga(Generic):
-    scraper = CloudScraper.create_scraper()
+    scraper = cloudscraper.create_scraper(
+        interpreter='js2py',  # Recommended for v3 challenges
+        delay=5,              # Allow more time for complex challenges
+        debug=True            # Enable debug output to see v3 detection
+    )
 
     def __init__(self, url, headers=None) -> None:
         self.headers = headers
@@ -17,8 +21,10 @@ class KunManga(Generic):
 
     @staticmethod
     def chapters(url):
-        response = KunManga.scraper.post(url)
+        print("Fetching chapters from KunManga:", url)
+        response = KunManga.scraper.get(url)
         html = response.text
+        print(html)
 
         soup = BeautifulSoup(html, "html.parser")
         print(soup.prettify())

@@ -9,6 +9,7 @@ from brscans.manhwa.tasks.sync_chapter import fix_pages
 from brscans.manhwa.tasks.upscale import upscale_pages
 from brscans.wrapper.sources import get_source_by_link
 from brscans.wrapper.sources.Generic import Generic
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 
 class ManhwaChapterViewSet(viewsets.ModelViewSet):

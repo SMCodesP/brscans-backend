@@ -46,6 +46,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
                     "chapters",
                     str(chapter.pk),
                 ],
+                chapter.manhwa.pk,
             )
 
         return Response({"status": "ok"})

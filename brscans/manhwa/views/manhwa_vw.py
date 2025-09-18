@@ -5,6 +5,9 @@ from django.db.models.expressions import RawSQL
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
 from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
 from brscans.manhwa.serializers import (
@@ -15,12 +18,11 @@ from brscans.manhwa.serializers import (
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
 from brscans.manhwa.tasks.sync_chapter import fix_pages, sync_chapter, sync_chapter_fix, sync_missing_original_pages
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
-from brscans.pagination import TotalPagination
+from brscans.pagination import TotalPaginationManhwa
 
 # from brscans.utils.anime4k import Anime4k
 from brscans.wrapper import sources
 from brscans.wrapper.sources.Generic import Generic
-
 
 class ManhwaViewSet(viewsets.ModelViewSet):
     queryset = (
@@ -30,8 +32,10 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         .prefetch_related("genres")
     )
     serializer_class = ManhwaSerializer
-    permission_classes = []
-    pagination_class = TotalPagination
+    pagination_class = TotalPaginationManhwa
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    search_fields = ["title", "description", "author", "source"]
+    ordering = ["-id"]
 
     def list(self, request, *args, **kwargs):
         self.queryset = self.queryset.filter(is_nsfw=False)
@@ -270,9 +274,10 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         id = str(result.get("id")).encode("utf-8")
 
         manhwa = Manhwa.objects.create(
-            external_id=id,
+            external_id=result.get("id"),
             hash_external_id=sha256(id).hexdigest(),
             title=result.get("title"),
+            slug=result.get("slug", None),
             source=result.get("url"),
             description=result.get("summary"),
             identifier=identifier,

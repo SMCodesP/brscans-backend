@@ -33,7 +33,7 @@ class Manhwa(models.Model):
     author = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=100)
     description = models.TextField()
-    external_id = models.SlugField(max_length=64, db_index=True, null=True)
+    external_id = models.CharField(max_length=64, db_index=True, null=True)
     slug = models.SlugField(max_length=64, db_index=True, null=True)
     hash_external_id = models.CharField(max_length=64, unique=True, null=True)
     hash_slug = models.CharField(max_length=64, unique=True, null=True)
@@ -68,4 +68,8 @@ class Chapter(models.Model):
 class Page(models.Model):
     chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name="pages")
     images = models.OneToOneField(ImageVariants, on_delete=models.CASCADE, null=True)
+    order = models.PositiveIntegerField(default=0)
     quantity_merged = models.IntegerField(null=True)
+
+    class Meta:
+        ordering = ["order"]

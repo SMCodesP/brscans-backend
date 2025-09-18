@@ -1,19 +1,24 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from io import BytesIO
+import os
 
 from cloudscraper import CloudScraper
 from django.core.files.base import ContentFile
 from PIL import Image
+from requests.adapters import HTTPAdapter
+import requests
 
-scraper = CloudScraper.create_scraper()
+session = requests.Session()
 
+adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
 
-# Função para baixar imagem a partir de uma URL
 def download_image(url):
     try:
         print("donwload_image url", url)
-        response = scraper.get(url)
+        response = requests.get(url)
         if response.status_code != 200:
             print(f"Erro ao baixar imagem: {url}")
         response.raise_for_status()
@@ -40,14 +45,15 @@ def merge_images(images):
 
 
 def download_images(urls):
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=50) as executor:
         images = list(executor.map(download_image, urls))
+        if any(img is None for img in images):
+            print("Algumas imagens falharam ao baixar.")
         images = [img for img in images if img is not None]
     return images
 
 
 def images_height(images):
-    print("images_height", images)
     return [{"height": image.height, "width": image.width} for image in images]
 
 
@@ -85,7 +91,7 @@ def batch_urls(images):
         grouped_images.append(current_group)
 
     print(
-        f"Levou {(datetime.now() - time).total_seconds():.2f} segundos para baixar as imagens."
+        f"Levou {(time - datetime.now()).total_seconds():.2f} segundos para baixar as imagens."
     )
     return grouped_images
 

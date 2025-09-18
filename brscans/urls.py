@@ -12,6 +12,7 @@ from brscans.manhwa.views.image import ImageVariantViewSet
 from brscans.manhwa.views.manhwa_chapter import ManhwaChapterViewSet
 from brscans.manhwa.views.manhwa_vw import ManhwaViewSet
 from brscans.wrapper.views import WrapperViewSet
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 router = DefaultRouter()
 router.register(r"manhwas", ManhwaViewSet, basename="manhwas")
@@ -28,6 +29,9 @@ urlpatterns = (
         path(r"", include(router.urls)),
         path(r"", include(client_router.urls)),
         path("admin/", admin.site.urls),
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+        path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     ]
     + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + debug_toolbar_urls()
