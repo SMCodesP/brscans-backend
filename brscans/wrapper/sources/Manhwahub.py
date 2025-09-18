@@ -6,6 +6,7 @@ from cloudscraper import CloudScraper
 from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class Manhwahub(Generic):
@@ -47,8 +48,8 @@ class Manhwahub(Generic):
         return manhwa
 
     @staticmethod
-    def chapters(url):
-        response = Manhwahub.scraper.get(url)
+    def chapters(manhwa: Manhwa):
+        response = Manhwahub.scraper.get(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -77,11 +78,11 @@ class Manhwahub(Generic):
         return chapters
 
     @staticmethod
-    def pages(chapter: str, content: str = None):
+    def pages(chapter: Chapter, content: str = None):
         if content:
             html = content
         else:
-            response = Manhwahub.scraper.get(chapter)
+            response = Manhwahub.scraper.get(chapter.source)
             html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -98,15 +99,15 @@ class Manhwahub(Generic):
         return pages
 
     @staticmethod
-    def chapter(chapter_link: str):
-        response = Manhwahub.scraper.get(chapter_link)
+    def chapter(chapter: Chapter):
+        response = Manhwahub.scraper.get(chapter.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
-        chapter = soup.find("li", class_="active")
+        chapter_element = soup.find("li", class_="active")
         title = soup.find("meta", property="og:title")
-        if chapter:
-            chapter = chapter.get_text().strip()
+        if chapter_element:
+            chapter_element = chapter_element.get_text().strip()
 
         if title:
             title = title.get("content")
@@ -115,6 +116,6 @@ class Manhwahub(Generic):
 
         return {
             "title": title,
-            "chapter": chapter,
-            "pages": Manhwahub.pages(chapter_link, html),
+            "chapter": chapter_element,
+            "pages": Manhwahub.pages(chapter, html),
         }

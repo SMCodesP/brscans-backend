@@ -4,6 +4,7 @@ from cloudscraper import CloudScraper
 from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class FlowerManga(Generic):
@@ -16,8 +17,8 @@ class FlowerManga(Generic):
         self.name = "FlowerManga"
 
     @staticmethod
-    def chapters(url):
-        response = FlowerManga.scraper.post(url)
+    def chapters(manhwa: Manhwa):
+        response = FlowerManga.scraper.post(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")

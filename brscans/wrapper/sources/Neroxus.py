@@ -4,6 +4,7 @@ from cloudscraper import CloudScraper
 from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class Neroxus(Generic):
@@ -16,8 +17,8 @@ class Neroxus(Generic):
         self.name = "Neroxus"
 
     @staticmethod
-    def chapters(url):
-        response = Neroxus.scraper.post(url)
+    def chapters(manhwa: Manhwa):
+        response = Neroxus.scraper.post(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")

@@ -7,6 +7,7 @@ import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag, NavigableString, Comment
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class KingOfShojo(Generic):
@@ -68,8 +69,8 @@ class KingOfShojo(Generic):
         return manhwa
 
     @staticmethod
-    def chapters(url):
-        response = KingOfShojo.scraper.get(url)
+    def chapters(manhwa: Manhwa):
+        response = KingOfShojo.scraper.get(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -98,11 +99,11 @@ class KingOfShojo(Generic):
         return chapters
 
     @staticmethod
-    def pages(chapter: str, content: str = None):
+    def pages(chapter: Chapter, content: str = None):
         if content:
             html = content
         else:
-            response = Generic.scraper.get(chapter)
+            response = Generic.scraper.get(chapter.source)
             html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -120,21 +121,21 @@ class KingOfShojo(Generic):
         return pages
 
     @staticmethod
-    def chapter(chapter_link: str):
-        response = KingOfShojo.scraper.get(chapter_link)
+    def chapter(chapter: Chapter):
+        response = KingOfShojo.scraper.get(chapter.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
-        chapter = soup.find("li", class_="active")
+        chapter_element = soup.find("li", class_="active")
         title = soup.find("h1", class_="entry-title")
-        if chapter:
-            chapter = chapter.get_text().strip()
+        if chapter_element:
+            chapter_element = chapter_element.get_text().strip()
 
         if title:
             title = title.get_text().strip()
 
         return {
             "title": title,
-            "chapter": chapter,
-            "pages": KingOfShojo.pages(chapter_link, html),
+            "chapter": chapter_element,
+            "pages": KingOfShojo.pages(chapter, html),
         }

@@ -4,6 +4,7 @@ import cloudscraper
 from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class KunManga(Generic):
@@ -20,9 +21,9 @@ class KunManga(Generic):
         self.name = "KunManga"
 
     @staticmethod
-    def chapters(url):
-        print("Fetching chapters from KunManga:", url)
-        response = KunManga.scraper.get(url)
+    def chapters(manhwa: Manhwa):
+        print("Fetching chapters from KunManga:", manhwa.source)
+        response = KunManga.scraper.get(manhwa.source)
         html = response.text
         print(html)
 

@@ -4,6 +4,7 @@ import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class Manhuaus(Generic):
@@ -16,8 +17,8 @@ class Manhuaus(Generic):
         self.name = "Manhuaus"
 
     @staticmethod
-    def chapters(url):
-        response = Manhuaus.scraper.post(url)
+    def chapters(manhwa: Manhwa):
+        response = Manhuaus.scraper.post(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")

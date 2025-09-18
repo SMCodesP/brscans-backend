@@ -6,6 +6,7 @@ from cloudscraper import CloudScraper
 from unidecode import unidecode
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class Mangadass(Generic):
@@ -45,8 +46,8 @@ class Mangadass(Generic):
         return manhwa
 
     @staticmethod
-    def chapters(url):
-        response = Generic.scraper.post(url)
+    def chapters(manhwa: Manhwa):
+        response = Generic.scraper.post(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -72,11 +73,11 @@ class Mangadass(Generic):
         return chapters
 
     @staticmethod
-    def pages(chapter: str, content: str = None):
+    def pages(chapter: Chapter, content: str = None):
         if content:
             html = content
         else:
-            response = Mangadass.scraper.get(chapter)
+            response = Mangadass.scraper.get(chapter.source)
             html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -93,15 +94,15 @@ class Mangadass(Generic):
         return pages
 
     @staticmethod
-    def chapter(chapter_link: str):
-        response = Mangadass.scraper.get(chapter_link)
+    def chapter(chapter: Chapter):
+        response = Mangadass.scraper.get(chapter.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
-        chapter = soup.find("option", class_="selected")
+        chapter_element = soup.find("option", class_="selected")
         title = soup.find("meta", property="og:title")
-        if chapter:
-            chapter = chapter.get_text().strip()
+        if chapter_element:
+            chapter_element = chapter_element.get_text().strip()
 
         if title:
             title = title.get("content")
@@ -110,6 +111,6 @@ class Mangadass(Generic):
 
         return {
             "title": title,
-            "chapter": chapter,
-            "pages": Mangadass.pages(chapter_link, html),
+            "chapter": chapter_element,
+            "pages": Mangadass.pages(chapter, html),
         }

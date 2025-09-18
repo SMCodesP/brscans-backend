@@ -6,6 +6,7 @@ import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.manhwa.models import Chapter, Manhwa
 
 
 class RizzFables(Generic):
@@ -50,8 +51,8 @@ class RizzFables(Generic):
         return manhwa
 
     @staticmethod
-    def chapters(url):
-        response = RizzFables.scraper.get(url)
+    def chapters(manhwa: Manhwa):
+        response = RizzFables.scraper.get(manhwa.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -79,11 +80,11 @@ class RizzFables(Generic):
         return chapters
 
     @staticmethod
-    def pages(chapter: str, content: str = None):
+    def pages(chapter: Chapter, content: str = None):
         if content:
             html = content
         else:
-            response = RizzFables.scraper.get(chapter)
+            response = RizzFables.scraper.get(chapter.source)
             html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -100,15 +101,15 @@ class RizzFables(Generic):
         return pages
 
     @staticmethod
-    def chapter(chapter_link: str):
-        response = RizzFables.scraper.get(chapter_link)
+    def chapter(chapter: Chapter):
+        response = RizzFables.scraper.get(chapter.source)
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
-        chapter = soup.find("select", id="chapter").find("option", selected=True)
+        chapter_element = soup.find("select", id="chapter").find("option", selected=True)
         title = soup.find("meta", property="og:title")
-        if chapter:
-            chapter = chapter.get_text().strip()
+        if chapter_element:
+            chapter_element = chapter_element.get_text().strip()
 
         if title:
             title = title.get("content")
@@ -117,6 +118,6 @@ class RizzFables(Generic):
 
         return {
             "title": title,
-            "chapter": chapter,
-            "pages": RizzFables.pages(chapter_link, html),
+            "chapter": chapter_element,
+            "pages": RizzFables.pages(chapter, html),
         }
