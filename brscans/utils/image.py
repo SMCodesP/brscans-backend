@@ -1,19 +1,18 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from io import BytesIO
-import os
 
-from cloudscraper import CloudScraper
+import requests
 from django.core.files.base import ContentFile
 from PIL import Image
 from requests.adapters import HTTPAdapter
-import requests
 
 session = requests.Session()
 
 adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50)
-session.mount('http://', adapter)
-session.mount('https://', adapter)
+session.mount("http://", adapter)
+session.mount("https://", adapter)
+
 
 def download_image(url):
     try:
@@ -45,7 +44,7 @@ def merge_images(images):
 
 
 def download_images(urls):
-    with ThreadPoolExecutor(max_workers=50) as executor:
+    with ThreadPoolExecutor() as executor:
         images = list(executor.map(download_image, urls))
         if any(img is None for img in images):
             print("Algumas imagens falharam ao baixar.")

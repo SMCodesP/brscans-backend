@@ -3,8 +3,9 @@ from brscans.wrapper.sources.Generic import Generic
 from brscans.wrapper.sources.KingOfShojo import KingOfShojo
 from brscans.wrapper.sources.KunManga import KunManga
 from brscans.wrapper.sources.MangaBuddy import MangaBuddy
-from brscans.wrapper.sources.MangaHub import MangaHub
 from brscans.wrapper.sources.Mangadass import Mangadass
+from brscans.wrapper.sources.MangaHub import MangaHub
+from brscans.wrapper.sources.ManhuaFast import ManhuaFast
 from brscans.wrapper.sources.ManhuaRead import ManhuaRead
 from brscans.wrapper.sources.Manhuaus import Manhuaus
 from brscans.wrapper.sources.Manhwahub import Manhwahub
@@ -23,6 +24,7 @@ sources = {
     "kunmanga.com": KunManga,
     "mangabuddy.com": MangaBuddy,
     "mangahub.io": MangaHub,
+    "manhuafast.net": ManhuaFast,
     "other": Generic,
 }
 

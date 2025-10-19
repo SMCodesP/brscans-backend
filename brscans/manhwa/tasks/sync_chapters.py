@@ -7,11 +7,10 @@ from brscans.wrapper.sources.Generic import Generic
 
 
 @task
-def sync_chapters(manhwa_id: int):
+def sync_chapters(manhwa_id: int, limit: int = 5):
     manhwa = Manhwa.objects.filter(id=manhwa_id).first()
     Source: Generic = sources.get_source_by_link(manhwa.source)
     chapters = Source.chapters(manhwa)
-    print("chapters", chapters)
     chapters = reversed(chapters)
     records = []
 
@@ -22,7 +21,7 @@ def sync_chapters(manhwa_id: int):
         if chapter_records == None:
             records.append(chapter)
 
-    for chapter in records[:5]:
+    for chapter in records[:limit]:
         chapter_records = Chapter.objects.create(
             slug=chapter.get("id"),
             title=chapter.get("title"),

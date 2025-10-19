@@ -1,11 +1,10 @@
 import json
 import os
+
 import httpx
 from unidecode import unidecode
-from bs4 import BeautifulSoup, ResultSet, Tag
 
 from brscans.manhwa.models import Chapter, Manhwa
-
 
 
 class MangaHub:
@@ -36,7 +35,6 @@ class MangaHub:
         payload = {"query": query}
         if variables:
             payload["variables"] = variables
-
 
         r = MangaHub().client.post(MangaHub.API_URL, json=payload)
         r.raise_for_status()
@@ -87,10 +85,9 @@ class MangaHub:
                     {
                         "number": ch["number"],
                         "title": unidecode(ch["title"]),
-                        "url": f"https://mangahub.io/chapter/{slug}/{ch["slug"]}",
+                        "url": f"https://mangahub.io/chapter/{slug}/{ch['slug']}",
                     }
                 )
-            
 
         return manhwa
 

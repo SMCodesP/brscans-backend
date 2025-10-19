@@ -19,7 +19,6 @@ from brscans.utils.image_url import image_url
 from brscans.utils.resize_image import resize_image
 
 
-
 @task
 def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = None):
     images = download_images(urls)
@@ -27,7 +26,6 @@ def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = N
 
     variants = []
 
-    # for batch in batches:
     for batch, idx in zip(batches, range(len(batches))):
         if len(batch) == 0:
             print("Empty batch, skipping...")
@@ -36,22 +34,26 @@ def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = N
         Page.objects.create(
             chapter_id=chapter, images=variant, quantity_merged=len(batch), order=idx
         )
-        variants.append({
-            "variant": variant.pk,
-            "batch": batch,
-            "folder": folder,
-            "main_id": main_id
-        })
+        variants.append(
+            {
+                "variant": variant.pk,
+                "batch": batch,
+                "folder": folder,
+                "main_id": main_id,
+            }
+        )
 
-    with ThreadPoolExecutor(max_workers=32) as executor:
+    with ThreadPoolExecutor() as executor:
         executor.map(proccess_merged, variants)
 
     return {"Message": "Created batches merged successfully."}
 
+
 def proccess_merged(data):
     print("Processing batch for variant", data.get("variant"))
-    return merge_batch_original(data.get("batch"), data.get("variant"), data.get("folder"), data.get("main_id"))
-
+    return merge_batch_original(
+        data.get("batch"), data.get("variant"), data.get("folder"), data.get("main_id")
+    )
 
 
 def merge_batch_original(
@@ -106,7 +108,7 @@ def process_image_translate(id, url: str, folder: str, main_id: str = None):
                 "path": path,
                 "folder": join(*folder),
             },
-            timeout=1,
+            timeout=5,
         )
     except Exception as e:
         print(e)
