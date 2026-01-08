@@ -128,9 +128,9 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def sync(self, request, pk=None):
-        limit = request.query_params.get("limit", 5)
+        limit = request.query_params.get("limit", "5")
         manhwa = Manhwa.objects.get(pk=pk)
-        sync_chapters(manhwa.pk, limit)
+        sync_chapters(manhwa.pk, int(limit))
         serializer = self.serializer_class(manhwa)
         return Response(serializer.data)
 
@@ -276,7 +276,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
         if manhwa:
             print("manhwa found")
-            sync_chapters(manhwa.pk, limit)
+            sync_chapters(manhwa.pk, int(limit))
 
             serializer = self.serializer_class(manhwa)
             return Response(serializer.data)
@@ -305,7 +305,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         add_original_image_variant(
             thumbnail.pk, result.get("image"), ["chapters", str(manhwa.pk)], False
         )
-        sync_chapters(manhwa.pk, limit)
+        sync_chapters(manhwa.pk, int(limit))
 
         return Response(self.serializer_class(manhwa).data)
 

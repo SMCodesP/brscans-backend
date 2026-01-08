@@ -12,7 +12,7 @@
         ],
         "profile_name": "brscans",
         "project_name": "brscans-backend",
-        "runtime": "python3.12",
+        "runtime": "python3.11",
         "s3_bucket": "brscans-zappa",
         "environment_variables": {
             "CLOUDFRONT_DOMAIN": "d47sf0ah3vbtc.cloudfront.net",

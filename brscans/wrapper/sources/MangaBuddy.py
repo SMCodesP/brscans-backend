@@ -5,8 +5,8 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 from cloudscraper import CloudScraper
 from unidecode import unidecode
 
-from brscans.wrapper.sources.Generic import Generic
 from brscans.manhwa.models import Chapter, Manhwa
+from brscans.wrapper.sources.Generic import Generic
 
 
 class MangaBuddy(Generic):
@@ -51,7 +51,9 @@ class MangaBuddy(Generic):
 
         soup = BeautifulSoup(html, "html.parser")
 
-        capes: ResultSet[Tag] = soup.find("ul", id="chapter-list").find_all("li")
+        capes: ResultSet[Tag] = soup.find("ul", id="chapter-list").find_all(
+            "li"
+        )
 
         chapters = []
 
@@ -79,17 +81,33 @@ class MangaBuddy(Generic):
             response = MangaBuddy.scraper.get(chapter.source)
             html = response.text
 
-        soup = BeautifulSoup(html, "html.parser")
+        # Try to extract from chapImages JavaScript variable first (contains all URLs)
+        match = re.search(r"var chapImages = '([^']+)'", html)
+        if match:
+            images_str = match.group(1)
+            pages = [
+                url.strip() for url in images_str.split(",") if url.strip()
+            ]
+            print(f"Found {len(pages)} images from chapImages variable")
+            return pages
 
-        capes: ResultSet[Tag] = soup.find("div", id="chapter-images").find_all("img")
-        print(capes)
+        # Fallback to HTML parsing if chapImages not found
+        soup = BeautifulSoup(html, "html.parser")
+        container = soup.find("div", id="chapter-images")
+        if not container:
+            print("Warning: chapter-images container not found")
+            return []
+
+        capes: ResultSet[Tag] = container.find_all("img")
+        print(f"Found {len(capes)} images from HTML")
 
         pages = []
 
         for cape in capes:
             src = cape.get("data-src") or cape.get("src")
-            url = src.strip()
-            pages.append(url)
+            if src:
+                url = src.strip()
+                pages.append(url)
 
         return pages
 
@@ -117,17 +135,16 @@ class MangaBuddy(Generic):
         }
 
 
-
 def extract_vars(soup):
     scripts = soup.find_all("script")
 
     js_text = " ".join(script.get_text() for script in scripts)
 
     patterns = {
-        "bookId": r'var\s+bookId\s*=\s*(\d+);',
+        "bookId": r"var\s+bookId\s*=\s*(\d+);",
         "bookSlug": r'var\s+bookSlug\s*=\s*"([^"]+)";',
         "chapterSlug": r'var\s+chapterSlug\s*=\s*"([^"]+)";',
-        "chapterId": r'var\s+chapterId\s*=\s*(\d+);',
+        "chapterId": r"var\s+chapterId\s*=\s*(\d+);",
         "pageTitle": r'var\s+pageTitle\s*=\s*"([^"]+)";',
         "pageSubTitle": r'var\s+pageSubTitle\s*=\s*"([^"]+)";',
         "bookCover": r'var\s+bookCover\s*=\s*"([^"]+)";',

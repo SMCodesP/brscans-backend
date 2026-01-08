@@ -14,12 +14,43 @@ session.mount("http://", adapter)
 session.mount("https://", adapter)
 
 
-def download_image(url):
+def normalize_url(url: str) -> str:
+    print("url", url)
+    """Remove barras extras ou corrige URLs malformadas."""
+    if url.startswith("https:///"):
+        url = url.replace("https:///", "https://", 1)
+    elif url.startswith("http:///"):
+        url = url.replace("http:///", "http://", 1)
+    return url
+
+
+def get_referer_from_url(url: str) -> str:
+    """Extrai o referer a partir do domínio da URL."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    # Para CDNs do MangaBuddy, usar mangabuddy.com como referer
+    if "mbcdn" in parsed.netloc or "mangabuddy" in parsed.netloc:
+        return "https://mangabuddy.com/"
+    return f"{parsed.scheme}://{parsed.netloc}/"
+
+
+def download_image(url, headers=None):
     try:
-        print("donwload_image url", url)
-        response = requests.get(url)
+        normalized_url = normalize_url(url)
+
+        default_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": get_referer_from_url(normalized_url),
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        }
+
+        if headers:
+            default_headers.update(headers)
+
+        response = requests.get(normalized_url, headers=default_headers)
         if response.status_code != 200:
-            print(f"Erro ao baixar imagem: {url}")
+            print(f"Erro ao baixar imagem: {normalized_url}")
         response.raise_for_status()
         return Image.open(BytesIO(response.content))
     except Exception as e:

@@ -66,14 +66,16 @@ class ChapterViewSet(viewsets.ModelViewSet):
             serializer = ChapterSerializer(chapter)
             return Response(serializer.data)
 
-        result = Generic.chapter(link)
-
         chapter = Chapter.objects.create(
-            title=result["title"],
-            slug=slugify(result["title"]),
             release_date=datetime.now(),
             identifier=identifier,
+            source=link,
         )
+
+        result = Generic.chapter(chapter)
+        chapter.title = result["title"]
+        chapter.slug = slugify(result["title"])
+        chapter.save()
 
         merge_pages_original(result["pages"], chapter.pk, ["chapters", str(chapter.pk)])
 
