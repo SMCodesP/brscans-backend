@@ -25,7 +25,12 @@ class MangaBuddy(Generic):
 
         soup = BeautifulSoup(html, "html.parser")
 
-        id = soup.find("meta", property="og:url").get("content").split("/")[-2]
+        id = (
+            soup.find("meta", property="og:url")
+            .get("content")
+            .rstrip("/")
+            .split("/")[-1]
+        )
         title = soup.find("div", class_="detail").find("h1").get_text().strip()
         image = soup.find("div", class_="img-cover").find("img")
         image = image.get("data-src") or image.get("src")
@@ -57,7 +62,7 @@ class MangaBuddy(Generic):
 
         chapters = []
 
-        for cape in capes[:2]:
+        for cape in capes:
             title = cape.find("a").find("strong").get_text().strip()
             chapter_url = "https://mangabuddy.com" + cape.find("a").get("href")
             chapter = {

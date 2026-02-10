@@ -11,6 +11,7 @@ from brscans.wrapper.sources.Manhuaus import Manhuaus
 from brscans.wrapper.sources.Manhwahub import Manhwahub
 from brscans.wrapper.sources.Neroxus import Neroxus
 from brscans.wrapper.sources.RizzFables import RizzFables
+from brscans.wrapper.sources.ThreeHentai import ThreeHentai
 
 sources = {
     "kingofshojo.com": KingOfShojo,
@@ -25,6 +26,8 @@ sources = {
     "mangabuddy.com": MangaBuddy,
     "mangahub.io": MangaHub,
     "manhuafast.net": ManhuaFast,
+    "pt.3hentai.net": ThreeHentai,
+    "3hentai.net": ThreeHentai,
     "other": Generic,
 }
 

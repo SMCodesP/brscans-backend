@@ -22,7 +22,6 @@ dependencies = [
     "xmltodict>=0.13.0,<0.14",
     "psycopg2-binary>=2.9.9,<3",
     "django-storages>=1.14.3,<2",
-    "zappa>=0.59.0,<0.60",
     "tldextract>=5.1.2,<6",
     "replicate>=0.28.0,<0.29",
     "django-debug-toolbar>=4.4.6,<5",
@@ -31,6 +30,7 @@ dependencies = [
     "python-dotenv>=1.0.1,<2",
     "drf-spectacular>=0.28.0,<0.29",
     "django-filter>=25.1,<26",
+    "zappa>=0.61.4",
 ]
 
 [build-system]

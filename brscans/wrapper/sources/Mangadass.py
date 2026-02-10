@@ -5,8 +5,8 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 from cloudscraper import CloudScraper
 from unidecode import unidecode
 
-from brscans.wrapper.sources.Generic import Generic
 from brscans.manhwa.models import Chapter, Manhwa
+from brscans.wrapper.sources.Generic import Generic
 
 
 class Mangadass(Generic):
@@ -25,8 +25,15 @@ class Mangadass(Generic):
 
         soup = BeautifulSoup(html, "html.parser")
 
-        id = soup.find("meta", property="og:url").get("content").split("/")[-2]
-        title = soup.find("div", class_="post-title").find("h1").get_text().strip()
+        id = (
+            soup.find("meta", property="og:url")
+            .get("content")
+            .rstrip("/")
+            .split("/")[-1]
+        )
+        title = (
+            soup.find("div", class_="post-title").find("h1").get_text().strip()
+        )
         summary = soup.find("div", class_="ss-manga").get_text().strip()
         image = soup.find("div", class_="summary_image").find("img")
         image = image.get("data-src") or image.get("src")
@@ -82,7 +89,9 @@ class Mangadass(Generic):
 
         soup = BeautifulSoup(html, "html.parser")
 
-        capes: ResultSet[Tag] = soup.find("div", class_="read-content").find_all("img")
+        capes: ResultSet[Tag] = soup.find(
+            "div", class_="read-content"
+        ).find_all("img")
 
         pages = []
 

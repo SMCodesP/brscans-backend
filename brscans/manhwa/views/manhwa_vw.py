@@ -102,6 +102,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         ).distinct()
 
         for chapter in chapters[:20]:
+            print("fix chapthers")
             fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
@@ -144,7 +145,10 @@ class ManhwaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def fix_caps(self, request, pk=None):
         chapters = Chapter.objects.filter(
-            (Q(pages__images__original__isnull=True) | Q(pages__images__original="")),
+            (
+                Q(pages__images__original__isnull=True)
+                | Q(pages__images__original="")
+            ),
             manhwa=pk,
         ).distinct()[:20]
 
@@ -171,7 +175,8 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         chapters = (
             Chapter.objects.filter(manhwa=pk, pages__images__isnull=False)
             .filter(
-                Q(pages__images__original__isnull=True) | Q(pages__images__original="")
+                Q(pages__images__original__isnull=True)
+                | Q(pages__images__original="")
             )
             .distinct()
         )
@@ -214,7 +219,8 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         chapters_affected = (
             Chapter.objects.filter(manhwa=pk, pages__images__isnull=False)
             .filter(
-                Q(pages__images__original__isnull=True) | Q(pages__images__original="")
+                Q(pages__images__original__isnull=True)
+                | Q(pages__images__original="")
             )
             .distinct()
             .count()
@@ -225,7 +231,8 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         chapters = (
             Chapter.objects.filter(manhwa=pk, pages__images__isnull=False)
             .filter(
-                Q(pages__images__original__isnull=True) | Q(pages__images__original="")
+                Q(pages__images__original__isnull=True)
+                | Q(pages__images__original="")
             )
             .distinct()[:10]
         )
@@ -233,7 +240,9 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         for chapter in chapters:
             pages_missing = (
                 Page.objects.filter(chapter=chapter)
-                .filter(Q(images__original__isnull=True) | Q(images__original=""))
+                .filter(
+                    Q(images__original__isnull=True) | Q(images__original="")
+                )
                 .count()
             )
 
@@ -303,7 +312,10 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
         print(manhwa.pk)
         add_original_image_variant(
-            thumbnail.pk, result.get("image"), ["chapters", str(manhwa.pk)], False
+            thumbnail.pk,
+            result.get("image"),
+            ["chapters", str(manhwa.pk)],
+            False,
         )
         sync_chapters(manhwa.pk, int(limit))
 

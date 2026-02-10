@@ -7,7 +7,11 @@ from brscans.manhwa.tasks.images_variants import (
     merge_pages_original,
     process_image_translate,
 )
-from brscans.utils.image import batch_images_with_split, batch_urls, download_images
+from brscans.utils.image import (
+    batch_images_with_split,
+    batch_urls,
+    download_images,
+)
 from brscans.wrapper.sources import get_source_by_link
 from brscans.wrapper.sources.Generic import Generic
 
@@ -63,12 +67,15 @@ def fix_pages(chapter_id: dict):
 
     for variant in variants:
         if variant.original:
+            print("Iniciando tradução")
             process_image_translate(
                 variant.pk,
                 variant.original.url,
                 ["chapters", str(chapter_records.pk)],
                 chapter_records.manhwa.pk,
             )
+        else:
+            print("Variante sem original")
 
 
 @task
@@ -133,7 +140,9 @@ def sync_missing_original_pages(chapter_id: int, manhwa_id: int):
         urls_needed = page.quantity_merged or 1
 
         # Se esta página não tem original
-        if page.images and (not page.images.original or page.images.original == ""):
+        if page.images and (
+            not page.images.original or page.images.original == ""
+        ):
             if url_index + urls_needed <= len(page_urls):
                 # Obter as URLs para esta página
                 urls_for_page = page_urls[url_index : url_index + urls_needed]
@@ -158,7 +167,9 @@ def sync_missing_original_pages(chapter_id: int, manhwa_id: int):
     }
 
 
-def add_original_to_page(variant_id: int, urls: list, folder: list, main_id: str):
+def add_original_to_page(
+    variant_id: int, urls: list, folder: list, main_id: str
+):
     """
     Adiciona a variant original a uma página existente sem deletá-la.
     """

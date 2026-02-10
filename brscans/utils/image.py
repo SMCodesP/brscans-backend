@@ -92,7 +92,7 @@ def batch_urls(images):
     time = datetime.now()
     sizes = images_height(images)
 
-    max_height = 16383
+    max_height = 8191
     grouped_images = []
     current_group = []
     current_height = 0
