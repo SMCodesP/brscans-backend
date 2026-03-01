@@ -57,6 +57,7 @@ class Chapter(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, db_index=True)
     release_date = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
     manhwa = models.ForeignKey(
         Manhwa, on_delete=models.CASCADE, related_name="chapters", null=True
     )
@@ -66,8 +67,12 @@ class Chapter(models.Model):
 
 
 class Page(models.Model):
-    chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name="pages")
-    images = models.OneToOneField(ImageVariants, on_delete=models.CASCADE, null=True)
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.CASCADE, related_name="pages"
+    )
+    images = models.OneToOneField(
+        ImageVariants, on_delete=models.CASCADE, null=True
+    )
     order = models.PositiveIntegerField(default=0)
     quantity_merged = models.IntegerField(null=True)
 

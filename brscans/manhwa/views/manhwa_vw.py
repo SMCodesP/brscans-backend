@@ -1,22 +1,22 @@
 from hashlib import sha256
 
-from django.db.models import Prefetch, Q
-from django.db.models.expressions import RawSQL
+from django.db.models import Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
-from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
+from brscans.manhwa.models import Chapter, Genre, ImageVariants, Manhwa, Page
 from brscans.manhwa.serializers import (
     ChapterSerializer,
+    GenreSerializer,
     ManhwaDetailSerializer,
     ManhwaSerializer,
+    RecentChapterSerializer,
 )
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
 from brscans.manhwa.tasks.sync_chapter import (
-    fix_pages,
     sync_chapter,
     sync_missing_original_pages,
 )
@@ -33,7 +33,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         Manhwa.objects.all()
         .order_by("-id")
         .select_related("thumbnail")
-        .prefetch_related("genres")
+        .prefetch_related("genres", "chapters")
     )
     serializer_class = ManhwaSerializer
     pagination_class = TotalPaginationManhwa
@@ -47,26 +47,26 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         self.queryset = self.queryset.prefetch_related(
-            Prefetch(
-                "chapters",
-                queryset=Chapter.objects.all()
-                .annotate(
-                    slug_number=RawSQL(
-                        """
-                    CASE 
-                        WHEN slug ~ '[0-9]+' 
-                        THEN CAST(
-                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
-                            AS INTEGER
-                        ) 
-                        ELSE NULL 
-                    END
-                    """,
-                        [],
-                    )
-                )
-                .order_by("slug_number"),
-            ),
+            # Prefetch(
+            #     "chapters",
+            #     queryset=Chapter.objects.all()
+            #     .annotate(
+            #         slug_number=RawSQL(
+            #             """
+            #         CASE
+            #             WHEN slug ~ '[0-9]+'
+            #             THEN CAST(
+            #                 (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1]
+            #                 AS INTEGER
+            #             )
+            #             ELSE NULL
+            #         END
+            #         """,
+            #             [],
+            #         )
+            #     )
+            #     .order_by("slug_number"),
+            # ),
             "chapters__pages",
             "chapters__pages__images",
         )
@@ -88,6 +88,43 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         serializer = ManhwaSerializer(manhwas, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"])
+    def recent_chapters(self, request):
+        """Latest chapters with parent manga data for the homepage carousel."""
+        limit = int(request.query_params.get("limit", 20))
+        chapters = (
+            Chapter.objects.filter(
+                manhwa__is_nsfw=False,
+                release_date__isnull=False,
+            )
+            .select_related("manhwa", "manhwa__thumbnail")
+            .order_by("-release_date")[:limit]
+        )
+        serializer = RecentChapterSerializer(chapters, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def top(self, request):
+        """Top mangas ranked by chapter count (popularity proxy)."""
+        limit = int(request.query_params.get("limit", 10))
+        manhwas = (
+            Manhwa.objects.filter(is_nsfw=False)
+            .annotate(chapter_count=Count("chapters"))
+            .filter(chapter_count__gt=0)
+            .select_related("thumbnail")
+            .prefetch_related("genres")
+            .order_by("-chapter_count")[:limit]
+        )
+        serializer = ManhwaSerializer(manhwas, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def genres(self, request):
+        """List all available genres."""
+        genres = Genre.objects.all().order_by("name")
+        serializer = GenreSerializer(genres, many=True)
+        return Response(serializer.data)
+
     @action(detail=True, methods=["get"])
     def count_fix_caps(self, request, pk=None):
         chapters = Chapter.objects.filter(
@@ -103,7 +140,12 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
         for chapter in chapters[:20]:
             print("fix chapthers")
-            fix_pages(chapter.pk)
+            pages = Page.objects.filter(
+                Q(images__original__isnull=True) | Q(images__original=""),
+                chapter=chapter,
+            )
+            pages.delete()
+            # fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
 
