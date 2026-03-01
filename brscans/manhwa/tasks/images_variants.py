@@ -23,6 +23,11 @@ from brscans.utils.resize_image import resize_image
 def merge_pages_original(
     urls: list, chapter: int, folder: str, main_id: str = None
 ):
+    # Guard: delete any existing pages for this chapter to prevent duplication
+    existing_pages = Page.objects.filter(chapter_id=chapter)
+    if existing_pages.exists():
+        existing_pages.delete()
+
     images = download_images(urls)
     batches = batch_images_with_split(images)
 

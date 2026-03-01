@@ -19,7 +19,11 @@ from brscans.wrapper.sources.Generic import Generic
 @task
 def sync_chapter(chapter_id: dict, manhwa_id: int):
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
-    # manhwa = chapter_records.manhwa
+
+    # Guard: skip if chapter already has pages (prevents duplication on retry)
+    if chapter_records.pages.exists():
+        return {"Message": "Chapter already has pages, skipping."}
+
     Source: Generic = get_source_by_link(chapter_records.source)
     chapter = Source.chapter(chapter_records)
     chapter_records.quantity_pages = len(chapter["pages"])

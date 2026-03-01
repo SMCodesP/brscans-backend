@@ -46,6 +46,9 @@ class Manhwa(models.Model):
     source = models.URLField(null=True, blank=True)
     identifier = models.CharField(max_length=255, null=True, unique=True)
 
+    original_title = models.CharField(max_length=255, null=True, blank=True)
+    original_description = models.TextField(null=True, blank=True)
+
     is_nsfw = models.BooleanField(default=False)
 
     genres = models.ManyToManyField(Genre, related_name="manhwas", blank=True)

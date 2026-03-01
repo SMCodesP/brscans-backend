@@ -31,6 +31,7 @@ dependencies = [
     "django-filter>=25.1,<26",
     "zappa>=0.61.4",
     "cloudscraper>=1.2.71",
+    "openai>=2.24.0",
 ]
 
 [build-system]

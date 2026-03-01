@@ -31,6 +31,7 @@ from brscans.manhwa.tasks.sync_chapter import (
     sync_missing_original_pages,
 )
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
+from brscans.manhwa.tasks.translate_manhwa import translate_manhwa
 from brscans.pagination import TotalPaginationManhwa
 
 # from brscans.utils.anime4k import Anime4k
@@ -419,6 +420,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             ["chapters", str(manhwa.pk)],
             False,
         )
+        translate_manhwa(manhwa.pk)
         sync_chapters(manhwa.pk, int(limit))
 
         return Response(self.serializer_class(manhwa).data)
