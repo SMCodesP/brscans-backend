@@ -47,7 +47,9 @@ class Generic:
         soup = BeautifulSoup(html, "html.parser")
 
         id = soup.find("meta", property="og:url").get("content").split("/")[-2]
-        title = soup.find("div", class_="post-title").find("h1").get_text().strip()
+        title = (
+            soup.find("div", class_="post-title").find("h1").get_text().strip()
+        )
         summary = soup.find("div", class_="summary__content")
         image = soup.find("div", class_="summary_image").find("img")
         image = image.get("data-src") or image.get("src")
@@ -101,12 +103,16 @@ class Generic:
         if content:
             html = content
         else:
-            response = Generic.scraper.get(chapter.source)
+            response = Generic.scraper.get(
+                chapter.source, headers={"Referer": chapter.source}
+            )
             html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
 
-        capes: ResultSet[Tag] = soup.find_all("img", class_="wp-manga-chapter-img")
+        capes: ResultSet[Tag] = soup.find_all(
+            "img", class_="wp-manga-chapter-img"
+        )
 
         pages = []
 
@@ -119,7 +125,9 @@ class Generic:
 
     @staticmethod
     def chapter(chapter: Chapter):
-        response = Generic.scraper.get(chapter.source)
+        response = Generic.scraper.get(
+            chapter.source, headers={"Referer": chapter.source}
+        )
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
