@@ -18,7 +18,7 @@ class Generic:
         self.name = "Generic"
 
     def homepage(self):
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, headers={"Referer": self.url})
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
         capes: ResultSet[Tag] = soup.find_all("div", class_="page-item-detail")
@@ -41,7 +41,7 @@ class Generic:
 
     @staticmethod
     def info(url, capthers: bool = False):
-        response = Generic.scraper.get(url)
+        response = Generic.scraper.get(url, headers={"Referer": url})
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -72,7 +72,9 @@ class Generic:
 
     @staticmethod
     def chapters(manhwa: Manhwa):
-        response = Generic.scraper.post(manhwa.source + "/ajax/chapters")
+        response = Generic.scraper.post(
+            manhwa.source + "/ajax/chapters", headers={"Referer": manhwa.source}
+        )
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
