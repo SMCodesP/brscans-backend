@@ -1,6 +1,7 @@
 from hashlib import sha256
 
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
+from django.db.models.expressions import RawSQL
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -54,27 +55,28 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def retrieve(self, request, *args, **kwargs):
-        self.queryset = self.queryset.prefetch_related(
-            # Prefetch(
-            #     "chapters",
-            #     queryset=Chapter.objects.all()
-            #     .annotate(
-            #         slug_number=RawSQL(
-            #             """
-            #         CASE
-            #             WHEN slug ~ '[0-9]+'
-            #             THEN CAST(
-            #                 (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1]
-            #                 AS INTEGER
-            #             )
-            #             ELSE NULL
-            #         END
-            #         """,
-            #             [],
-            #         )
-            #     )
-            #     .order_by("slug_number"),
-            # ),
+        self.queryset = self.queryset.prefetch_related(None).prefetch_related(
+            "genres",
+            Prefetch(
+                "chapters",
+                queryset=Chapter.objects.all()
+                .annotate(
+                    slug_number=RawSQL(
+                        """
+                    CASE 
+                        WHEN slug ~ '[0-9]+' 
+                        THEN CAST(
+                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
+                            AS INTEGER
+                        ) 
+                        ELSE NULL 
+                    END
+                    """,
+                        [],
+                    )
+                )
+                .order_by("slug_number"),
+            ),
             "chapters__pages",
             "chapters__pages__images",
         )
