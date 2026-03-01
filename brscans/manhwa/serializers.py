@@ -2,7 +2,21 @@ from django.db.models import Sum
 from django.db.models.expressions import RawSQL
 from rest_framework import serializers
 
-from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
+from brscans.manhwa.models import (
+    Chapter,
+    Comment,
+    Genre,
+    ImageVariants,
+    Manhwa,
+    Notification,
+    Page,
+)
+
+
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = ("id", "name", "slug")
 
 
 class VariantsSerializer(serializers.ModelSerializer):
@@ -41,6 +55,7 @@ class SimpleChapterSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "release_date",
+            "created_at",
             "quantity_pages",
             "quantity_merged",
         )
@@ -158,6 +173,11 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
 
 class ManhwaSerializer(serializers.ModelSerializer):
     thumbnail = VariantsSerializer()
+    latest_chapters = serializers.SerializerMethodField()
+
+    def get_latest_chapters(self, obj):
+        chapters = obj.chapters.order_by("-id")[:2]
+        return SimpleChapterSerializer(chapters, many=True).data
 
     class Meta:
         model = Manhwa
@@ -176,6 +196,7 @@ class ManhwaSerializer(serializers.ModelSerializer):
             "source",
             "identifier",
             "genres",
+            "latest_chapters",
         )
 
 
@@ -201,4 +222,82 @@ class ManhwaDetailSerializer(serializers.ModelSerializer):
             "identifier",
             "genres",
             "chapters",
+        )
+
+
+class ManhwaBriefSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for embedding manga info inside chapter responses."""
+
+    thumbnail = VariantsSerializer()
+
+    class Meta:
+        model = Manhwa
+        fields = ("id", "title", "slug", "thumbnail")
+
+
+class RecentChapterSerializer(serializers.ModelSerializer):
+    """Chapter with parent manga info for the recent chapters carousel."""
+
+    manhwa = ManhwaBriefSerializer()
+
+    class Meta:
+        model = Chapter
+        fields = (
+            "id",
+            "title",
+            "slug",
+            "release_date",
+            "manhwa",
+        )
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    user_avatar = serializers.SerializerMethodField(read_only=True)
+    replies = serializers.SerializerMethodField()
+
+    def get_user_avatar(self, obj):
+        if hasattr(obj.user, "profile") and obj.user.profile.avatar:
+            return obj.user.profile.avatar
+        return None
+
+    def get_replies(self, obj):
+        # By removing the parent verification, we recursively gather replies indefinitely
+        return CommentSerializer(obj.replies.all(), many=True).data
+
+    class Meta:
+        model = Comment
+        fields = (
+            "id",
+            "user_name",
+            "user_avatar",
+            "content",
+            "created_at",
+            "parent",
+            "replies",
+            "chapter",
+        )
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    manhwa_title = serializers.CharField(source="manhwa.title", read_only=True)
+    manhwa_slug = serializers.CharField(source="manhwa.slug", read_only=True)
+    chapter_title = serializers.CharField(
+        source="chapter.title", read_only=True
+    )
+    chapter_slug = serializers.CharField(source="chapter.slug", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = (
+            "id",
+            "type",
+            "manhwa",
+            "manhwa_title",
+            "manhwa_slug",
+            "chapter",
+            "chapter_title",
+            "chapter_slug",
+            "read",
+            "created_at",
         )

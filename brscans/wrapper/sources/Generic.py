@@ -18,7 +18,7 @@ class Generic:
         self.name = "Generic"
 
     def homepage(self):
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, headers={"Referer": self.url})
         html = response.text
         soup = BeautifulSoup(html, "html.parser")
         capes: ResultSet[Tag] = soup.find_all("div", class_="page-item-detail")
@@ -41,13 +41,15 @@ class Generic:
 
     @staticmethod
     def info(url, capthers: bool = False):
-        response = Generic.scraper.get(url)
+        response = Generic.scraper.get(url, headers={"Referer": url})
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
 
         id = soup.find("meta", property="og:url").get("content").split("/")[-2]
-        title = soup.find("div", class_="post-title").find("h1").get_text().strip()
+        title = (
+            soup.find("div", class_="post-title").find("h1").get_text().strip()
+        )
         summary = soup.find("div", class_="summary__content")
         image = soup.find("div", class_="summary_image").find("img")
         image = image.get("data-src") or image.get("src")
@@ -70,7 +72,9 @@ class Generic:
 
     @staticmethod
     def chapters(manhwa: Manhwa):
-        response = Generic.scraper.post(manhwa.source + "/ajax/chapters")
+        response = Generic.scraper.post(
+            manhwa.source + "/ajax/chapters", headers={"Referer": manhwa.source}
+        )
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -101,12 +105,16 @@ class Generic:
         if content:
             html = content
         else:
-            response = Generic.scraper.get(chapter.source)
+            response = Generic.scraper.get(
+                chapter.source, headers={"Referer": chapter.source}
+            )
             html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
 
-        capes: ResultSet[Tag] = soup.find_all("img", class_="wp-manga-chapter-img")
+        capes: ResultSet[Tag] = soup.find_all(
+            "img", class_="wp-manga-chapter-img"
+        )
 
         pages = []
 
@@ -119,7 +127,9 @@ class Generic:
 
     @staticmethod
     def chapter(chapter: Chapter):
-        response = Generic.scraper.get(chapter.source)
+        response = Generic.scraper.get(
+            chapter.source, headers={"Referer": chapter.source}
+        )
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")

@@ -24,7 +24,9 @@ load_dotenv()
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-y3ji3t=%kq$4%i95)-kqh6ey&dae795dve-r^+_xb_xm62s43&"
+SECRET_KEY = (
+    "django-insecure-y3ji3t=%kq$4%i95)-kqh6ey&dae795dve-r^+_xb_xm62s43&"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -53,6 +55,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "brscans.manhwa.apps.manhwaConfig",
+    "brscans.authentication.apps.AuthenticationConfig",
     "django_filters",
     "drf_spectacular",
 ]
@@ -106,7 +109,7 @@ DATABASES = {
 }
 
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",

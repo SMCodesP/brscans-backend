@@ -20,7 +20,9 @@ from brscans.utils.resize_image import resize_image
 
 
 @task
-def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = None):
+def merge_pages_original(
+    urls: list, chapter: int, folder: str, main_id: str = None
+):
     images = download_images(urls)
     batches = batch_images_with_split(images)
 
@@ -32,7 +34,10 @@ def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = N
             continue
         variant = ImageVariants.objects.create()
         Page.objects.create(
-            chapter_id=chapter, images=variant, quantity_merged=len(batch), order=idx
+            chapter_id=chapter,
+            images=variant,
+            quantity_merged=len(batch),
+            order=idx,
         )
         variants.append(
             {
@@ -52,7 +57,10 @@ def merge_pages_original(urls: list, chapter: int, folder: str, main_id: str = N
 def proccess_merged(data):
     print("Processing batch for variant", data.get("variant"))
     return merge_batch_original(
-        data.get("batch"), data.get("variant"), data.get("folder"), data.get("main_id")
+        data.get("batch"),
+        data.get("variant"),
+        data.get("folder"),
+        data.get("main_id"),
     )
 
 
@@ -72,7 +80,9 @@ def merge_batch_original(
 
 
 @task
-def add_original_image_variant(id: int, url: str, folder: str, translate: bool = True):
+def add_original_image_variant(
+    id: int, url: str, folder: str, translate: bool = True
+):
     variant = ImageVariants.objects.filter(id=id).first()
 
     if variant:

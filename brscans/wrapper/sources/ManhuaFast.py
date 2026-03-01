@@ -13,12 +13,22 @@ class ManhuaFast(Generic):
     def __init__(self, url, headers=None) -> None:
         self.headers = headers
         self.url = url
-        self.client = httpx.Client(timeout=None)
+        self.client = httpx.Client(
+            timeout=None,
+            headers={
+                "Referer": f"{self.url}",
+            },
+        )
         self.name = "ManhuaFast"
 
     @staticmethod
     def chapters(manhwa: Manhwa):
-        response = ManhuaFast.scraper.post(f"{manhwa.source}/ajax/chapters/")
+        response = ManhuaFast.scraper.post(
+            f"{manhwa.source}/ajax/chapters/",
+            headers={
+                "Referer": f"{manhwa.source}/ajax/chapters/",
+            },
+        )
         html = response.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -43,5 +53,4 @@ class ManhuaFast(Generic):
                 .capitalize(),
             }
             chapters.append(chapter)
-
         return chapters

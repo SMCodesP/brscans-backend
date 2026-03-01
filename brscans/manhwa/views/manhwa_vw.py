@@ -1,6 +1,6 @@
 from hashlib import sha256
 
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.db.models.expressions import RawSQL
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
@@ -8,11 +8,21 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
-from brscans.manhwa.models import Chapter, ImageVariants, Manhwa, Page
+from brscans.manhwa.models import (
+    Chapter,
+    Genre,
+    ImageVariants,
+    Manhwa,
+    Page,
+    ReadChapter,
+    ReadingHistory,
+)
 from brscans.manhwa.serializers import (
     ChapterSerializer,
+    GenreSerializer,
     ManhwaDetailSerializer,
     ManhwaSerializer,
+    RecentChapterSerializer,
 )
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
 from brscans.manhwa.tasks.sync_chapter import (
@@ -33,7 +43,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         Manhwa.objects.all()
         .order_by("-id")
         .select_related("thumbnail")
-        .prefetch_related("genres")
+        .prefetch_related("genres", "chapters")
     )
     serializer_class = ManhwaSerializer
     pagination_class = TotalPaginationManhwa
@@ -46,7 +56,8 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def retrieve(self, request, *args, **kwargs):
-        self.queryset = self.queryset.prefetch_related(
+        self.queryset = self.queryset.prefetch_related(None).prefetch_related(
+            "genres",
             Prefetch(
                 "chapters",
                 queryset=Chapter.objects.all()
@@ -82,10 +93,102 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             | Q(description__icontains=query)
             | Q(author__icontains=query)
             | Q(genres__name__icontains=query)
-            | Q(source__name__icontains=query)
-        )
+            | Q(source__icontains=query)
+        ).distinct()
 
         serializer = ManhwaSerializer(manhwas, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def recent_chapters(self, request):
+        """Latest chapters with parent manga data for the homepage carousel."""
+        limit = int(request.query_params.get("limit", 20))
+        chapters = (
+            Chapter.objects.filter(
+                manhwa__is_nsfw=False,
+                release_date__isnull=False,
+            )
+            .select_related("manhwa", "manhwa__thumbnail")
+            .order_by("-release_date")[:limit]
+        )
+        serializer = RecentChapterSerializer(chapters, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def top(self, request):
+        """Top mangas ranked by read chapters count (popularity proxy)."""
+        limit = int(request.query_params.get("limit", 10))
+        manhwas = (
+            Manhwa.objects.filter(is_nsfw=False)
+            .annotate(read_count=Count("read_chapters"))
+            .select_related("thumbnail")
+            .prefetch_related("genres")
+            .order_by("-read_count", "-id")[:limit]
+        )
+        serializer = ManhwaSerializer(manhwas, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def progress(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response({"error": "Autenticação necessária."}, status=401)
+
+        manhwa = self.get_object()
+        chapter_id = request.data.get("chapter_id")
+        page_number = request.data.get("page_number", 1)
+
+        if not chapter_id:
+            return Response({"error": "chapter_id é obrigatório."}, status=400)
+
+        ReadingHistory.objects.update_or_create(
+            user=request.user,
+            manhwa=manhwa,
+            defaults={"chapter_id": chapter_id, "page_number": page_number},
+        )
+        return Response({"status": "Progresso salvo."})
+
+    @action(detail=True, methods=["get"], url_path="read-chapters")
+    def read_chapters(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response([])
+
+        manhwa = self.get_object()
+        read_chapters = ReadChapter.objects.filter(
+            user=request.user, manhwa=manhwa
+        ).values_list("chapter_id", flat=True)
+
+        return Response(list(read_chapters))
+
+    @action(detail=False, methods=["get"], url_path="reading-history")
+    def reading_history(self, request):
+        if not request.user.is_authenticated:
+            return Response([])
+
+        limit = int(request.query_params.get("limit", 10))
+        history = (
+            ReadingHistory.objects.filter(user=request.user)
+            .select_related("manhwa", "manhwa__thumbnail", "chapter")
+            .order_by("-updated_at")[:limit]
+        )
+
+        data = []
+        for h in history:
+            data.append(
+                {
+                    "manhwa": ManhwaSerializer(h.manhwa).data,
+                    "chapter": ChapterSerializer(h.chapter).data,
+                    "page_number": h.page_number,
+                    "updated_at": h.updated_at,
+                }
+            )
+
+        return Response(data)
+
+    @action(detail=False, methods=["get"])
+    def genres(self, request):
+        """List all available genres."""
+        genres = Genre.objects.all().order_by("name")
+        serializer = GenreSerializer(genres, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
@@ -102,7 +205,6 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         ).distinct()
 
         for chapter in chapters[:20]:
-            print("fix chapthers")
             fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
