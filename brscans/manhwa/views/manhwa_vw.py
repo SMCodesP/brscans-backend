@@ -26,6 +26,7 @@ from brscans.manhwa.serializers import (
 )
 from brscans.manhwa.tasks.images_variants import add_original_image_variant
 from brscans.manhwa.tasks.sync_chapter import (
+    fix_pages,
     sync_chapter,
     sync_missing_original_pages,
 )
@@ -204,13 +205,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         ).distinct()
 
         for chapter in chapters[:20]:
-            print("fix chapthers")
-            pages = Page.objects.filter(
-                Q(images__original__isnull=True) | Q(images__original=""),
-                chapter=chapter,
-            )
-            pages.delete()
-            # fix_pages(chapter.pk)
+            fix_pages(chapter.pk)
 
         return Response({"count": chapters.count()})
 
