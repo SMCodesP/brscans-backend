@@ -7,8 +7,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from slugify import slugify
 
-from brscans.manhwa.models import Chapter
-from brscans.manhwa.serializers import ChapterNextPreviousSerializer, ChapterSerializer
+from brscans.manhwa.models import Chapter, ReadChapter
+from brscans.manhwa.serializers import (
+    ChapterNextPreviousSerializer,
+    ChapterSerializer,
+)
 from brscans.manhwa.tasks.images_variants import (
     merge_pages_original,
     process_image_translate,
@@ -51,6 +54,17 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
         return Response({"status": "ok"})
 
+    @action(detail=True, methods=["post"], url_path="mark-read")
+    def mark_read(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response({"error": "Autenticação necessária."}, status=401)
+
+        chapter = self.get_object()
+        ReadChapter.objects.get_or_create(
+            user=request.user, manhwa=chapter.manhwa, chapter=chapter
+        )
+        return Response({"status": "Marcado como lido."})
+
     @action(detail=False, methods=["get"])
     def download(self, request):
         link = request.query_params.get("link")
@@ -77,7 +91,9 @@ class ChapterViewSet(viewsets.ModelViewSet):
         chapter.slug = slugify(result["title"])
         chapter.save()
 
-        merge_pages_original(result["pages"], chapter.pk, ["chapters", str(chapter.pk)])
+        merge_pages_original(
+            result["pages"], chapter.pk, ["chapters", str(chapter.pk)]
+        )
 
         serializer = ChapterSerializer(chapter)
         return Response(serializer.data)

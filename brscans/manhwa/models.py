@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class ImageVariants(models.Model):
@@ -78,3 +80,133 @@ class Page(models.Model):
 
     class Meta:
         ordering = ["order"]
+
+
+class ReadingHistory(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reading_history",
+    )
+    manhwa = models.ForeignKey(
+        Manhwa, on_delete=models.CASCADE, related_name="reading_history"
+    )
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.CASCADE, related_name="reading_history"
+    )
+    page_number = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "manhwa")
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.user} - {self.manhwa} (Cap. {self.chapter.title}, Pág. {self.page_number})"
+
+
+class ReadChapter(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="read_chapters",
+    )
+    manhwa = models.ForeignKey(
+        Manhwa, on_delete=models.CASCADE, related_name="read_chapters"
+    )
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.CASCADE, related_name="read_chapters"
+    )
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "chapter")
+        ordering = ["-read_at"]
+
+    def __str__(self):
+        return f"{self.user} leu {self.chapter.title} ({self.manhwa.title})"
+
+
+class Comment(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.CASCADE, related_name="comments"
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} em {self.chapter}: {self.content[:20]}"
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = (
+        ("new_chapter", "Novo Capítulo"),
+        ("system", "Sistema"),
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    type = models.CharField(
+        max_length=20, choices=NOTIFICATION_TYPES, default="new_chapter"
+    )
+    manhwa = models.ForeignKey(
+        Manhwa,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    chapter = models.ForeignKey(
+        Chapter,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Notificação para {self.user}: {self.type} - Lido: {self.read}"
+
+
+@receiver(post_save, sender=Chapter)
+def create_chapter_notification(sender, instance, created, **kwargs):
+    if created and instance.manhwa:
+        from brscans.authentication.models import Favorite
+
+        favorites = Favorite.objects.filter(
+            manhwa=instance.manhwa
+        ).select_related("user")
+        notifications = []
+        for fav in favorites:
+            notifications.append(
+                Notification(
+                    user=fav.user,
+                    type="new_chapter",
+                    manhwa=instance.manhwa,
+                    chapter=instance,
+                )
+            )
+        if notifications:
+            Notification.objects.bulk_create(notifications)

@@ -13,9 +13,11 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
 
 from brscans.manhwa.views.chapter import ChapterViewSet
+from brscans.manhwa.views.comment_vw import CommentViewSet
 from brscans.manhwa.views.image import ImageVariantViewSet
 from brscans.manhwa.views.manhwa_chapter import ManhwaChapterViewSet
 from brscans.manhwa.views.manhwa_vw import ManhwaViewSet
+from brscans.manhwa.views.notification_vw import NotificationViewSet
 from brscans.wrapper.views import WrapperViewSet
 
 router = DefaultRouter()
@@ -23,6 +25,8 @@ router.register(r"manhwas", ManhwaViewSet, basename="manhwas")
 router.register(r"wrapper", WrapperViewSet, basename="wrapper")
 router.register(r"chapters", ChapterViewSet, basename="chapters")
 router.register(r"images", ImageVariantViewSet, basename="image-variants")
+router.register(r"comments", CommentViewSet, basename="comments")
+router.register(r"notifications", NotificationViewSet, basename="notifications")
 
 client_router = routers.NestedSimpleRouter(router, r"manhwas", lookup="manhwa")
 client_router.register(r"chapters", ManhwaChapterViewSet, basename="chapters")

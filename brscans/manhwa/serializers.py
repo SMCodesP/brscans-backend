@@ -2,7 +2,15 @@ from django.db.models import Sum
 from django.db.models.expressions import RawSQL
 from rest_framework import serializers
 
-from brscans.manhwa.models import Chapter, Genre, ImageVariants, Manhwa, Page
+from brscans.manhwa.models import (
+    Chapter,
+    Comment,
+    Genre,
+    ImageVariants,
+    Manhwa,
+    Notification,
+    Page,
+)
 
 
 class GenreSerializer(serializers.ModelSerializer):
@@ -240,4 +248,56 @@ class RecentChapterSerializer(serializers.ModelSerializer):
             "slug",
             "release_date",
             "manhwa",
+        )
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    user_avatar = serializers.SerializerMethodField(read_only=True)
+    replies = serializers.SerializerMethodField()
+
+    def get_user_avatar(self, obj):
+        if hasattr(obj.user, "profile") and obj.user.profile.avatar:
+            return obj.user.profile.avatar
+        return None
+
+    def get_replies(self, obj):
+        # By removing the parent verification, we recursively gather replies indefinitely
+        return CommentSerializer(obj.replies.all(), many=True).data
+
+    class Meta:
+        model = Comment
+        fields = (
+            "id",
+            "user_name",
+            "user_avatar",
+            "content",
+            "created_at",
+            "parent",
+            "replies",
+            "chapter",
+        )
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    manhwa_title = serializers.CharField(source="manhwa.title", read_only=True)
+    manhwa_slug = serializers.CharField(source="manhwa.slug", read_only=True)
+    chapter_title = serializers.CharField(
+        source="chapter.title", read_only=True
+    )
+    chapter_slug = serializers.CharField(source="chapter.slug", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = (
+            "id",
+            "type",
+            "manhwa",
+            "manhwa_title",
+            "manhwa_slug",
+            "chapter",
+            "chapter_title",
+            "chapter_slug",
+            "read",
+            "created_at",
         )
