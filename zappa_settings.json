@@ -20,7 +20,7 @@
             "S3_STATIC_BUCKET": "brscans-media",
             "S3_REGION": "sa-east-1"
         },
-        "timeout_seconds": 30,
+        "timeout_seconds": 900,
         "memory_size": 3008
     }
 }

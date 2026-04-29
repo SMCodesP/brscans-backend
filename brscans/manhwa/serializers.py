@@ -251,6 +251,7 @@ class RecentChapterSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "release_date",
+            "created_at",
             "manhwa",
         )
 

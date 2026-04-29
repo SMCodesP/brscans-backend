@@ -5,12 +5,12 @@ from django.dispatch import receiver
 
 
 class ImageVariants(models.Model):
-    minimum = models.ImageField(null=True)
-    medium = models.ImageField(null=True)
-    original = models.ImageField(null=True)
-    translated = models.ImageField(null=True)
-    raw = models.ImageField(null=True)
-    upscaled = models.ImageField(null=True)
+    minimum = models.ImageField(blank=True, null=True)
+    medium = models.ImageField(blank=True, null=True)
+    original = models.ImageField(blank=True, null=True)
+    translated = models.ImageField(blank=True, null=True)
+    raw = models.ImageField(blank=True, null=True)
+    upscaled = models.ImageField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if self.translated and self.translated.name.startswith(

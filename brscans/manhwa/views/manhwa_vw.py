@@ -1,6 +1,7 @@
 from hashlib import sha256
 
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Max, Prefetch, Q
+from django.db.models.functions import Coalesce
 from django.db.models.expressions import RawSQL
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
@@ -50,10 +51,27 @@ class ManhwaViewSet(viewsets.ModelViewSet):
     pagination_class = TotalPaginationManhwa
     filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
     search_fields = ["title", "description", "author", "source"]
-    ordering = ["-id"]
+    ordering = []
 
     def list(self, request, *args, **kwargs):
-        self.queryset = self.queryset.filter(is_nsfw=False)
+        queryset = self.queryset.filter(is_nsfw=False)
+
+        # Default ordering by recent chapter activity.
+        if not request.query_params.get("ordering"):
+            queryset = (
+                queryset.filter(chapters__isnull=False)
+                .annotate(latest_release=Max("chapters__release_date"))
+                .annotate(latest_created=Max("chapters__created_at"))
+                .annotate(
+                    latest_activity=Coalesce(
+                        "latest_release", "latest_created"
+                    )
+                )
+                .filter(latest_activity__isnull=False)
+                .order_by("-latest_activity", "-id")
+            )
+
+        self.queryset = queryset
         return super().list(request, *args, **kwargs)
 
     def retrieve(self, request, *args, **kwargs):
@@ -107,10 +125,11 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         chapters = (
             Chapter.objects.filter(
                 manhwa__is_nsfw=False,
-                release_date__isnull=False,
             )
+            .annotate(sort_date=Coalesce("release_date", "created_at"))
+            .filter(sort_date__isnull=False)
             .select_related("manhwa", "manhwa__thumbnail")
-            .order_by("-release_date")[:limit]
+            .order_by("-sort_date", "-id")[:limit]
         )
         serializer = RecentChapterSerializer(chapters, many=True)
         return Response(serializer.data)
