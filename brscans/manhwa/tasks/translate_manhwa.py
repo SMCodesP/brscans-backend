@@ -9,10 +9,10 @@ from brscans.manhwa.models import Manhwa
 
 client = OpenAI(
     api_key="sk-f9a18faeb596425886f17afac4325c38",
-    base_url="https://ds2api-blond.vercel.app/v1",
+    base_url="https://ds2api-codes.vercel.app/v1",
 )
 
-MODEL = "deepseek-chat"
+MODEL = "deepseek-v4-flash"
 
 
 def _translate_with_retry(title: str, description: str, max_retries=12):

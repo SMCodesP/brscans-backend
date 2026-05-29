@@ -1,8 +1,8 @@
 from hashlib import sha256
 
 from django.db.models import Count, Max, Prefetch, Q
-from django.db.models.functions import Coalesce
 from django.db.models.expressions import RawSQL
+from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -32,7 +32,6 @@ from brscans.manhwa.tasks.sync_chapter import (
     sync_missing_original_pages,
 )
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
-from brscans.manhwa.tasks.translate_manhwa import translate_manhwa
 from brscans.pagination import TotalPaginationManhwa
 
 # from brscans.utils.anime4k import Anime4k
@@ -224,10 +223,21 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             pages__images__original__isnull=False,
         ).distinct()
 
+        sum_all = 0
+        for chapter in chapters:
+            variants_count = ImageVariants.objects.filter(
+                Q(translated__isnull=True) | Q(translated=""),
+                page__chapter=chapter,
+                original__isnull=False,
+            ).count()
+            sum_all += variants_count
+        
+        print("Quantidade de paginas para serem traduzidas", sum_all)
+
         for chapter in chapters[:20]:
             fix_pages(chapter.pk)
 
-        return Response({"count": chapters.count()})
+        return Response({"count": sum_all})
 
     @action(detail=True, methods=["get"])
     def count_pages_original(self, request, pk=None):
@@ -439,7 +449,7 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             ["chapters", str(manhwa.pk)],
             False,
         )
-        translate_manhwa(manhwa.pk)
+        # translate_manhwa(manhwa.pk)
         sync_chapters(manhwa.pk, int(limit))
 
         return Response(self.serializer_class(manhwa).data)

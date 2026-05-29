@@ -11,7 +11,7 @@ def sync_chapters(manhwa_id: int, limit: int = 5):
     manhwa = Manhwa.objects.filter(id=manhwa_id).first()
     Source: Generic = sources.get_source_by_link(manhwa.source)
     chapters = Source.chapters(manhwa)
-    chapters = reversed(chapters)
+    # chapters = reversed(chapters)
     records = []
 
     for chapter in chapters:

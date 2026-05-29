@@ -1,5 +1,7 @@
+import re
+from decimal import Decimal
+
 from django.db.models import Sum
-from django.db.models.expressions import RawSQL
 from rest_framework import serializers
 
 from brscans.manhwa.models import (
@@ -91,69 +93,51 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
         return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
 
     def get_slug_number(self, slug):
-        """Extrai o primeiro número do slug como inteiro."""
-        import re
+        numbers = re.findall(r"\d+", slug or "")
+        if not numbers:
+            return None
 
-        match = re.search(r"\d+", slug)
-        if match:
-            return int(match.group())
-        return None
+        if len(numbers) >= 2 and re.search(r"-\d+-\d+$", slug or ""):
+            return Decimal(f"{numbers[-2]}.{numbers[-1]}")
+
+        return Decimal(numbers[-1])
+
+    def get_ordered_chapters(self, obj):
+        chapters = []
+
+        for chapter in Chapter.objects.filter(manhwa=obj.manhwa):
+            slug_number = self.get_slug_number(chapter.slug)
+            if slug_number is not None:
+                chapters.append((slug_number, chapter.id, chapter))
+
+        return sorted(chapters, key=lambda item: (item[0], item[1]))
 
     def get_next(self, obj):
-        # Calcula o slug_number do capítulo atual
         current_slug_number = self.get_slug_number(obj.slug)
         if current_slug_number is None:
             return None
 
-        # Busca o próximo capítulo com slug_number maior que o atual
-        next_chapter = (
-            Chapter.objects.filter(manhwa=obj.manhwa)
-            .annotate(
-                slug_number=RawSQL(
-                    """
-                    CASE 
-                        WHEN slug ~ '[0-9]+' 
-                        THEN CAST(
-                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
-                            AS INTEGER
-                        ) 
-                        ELSE NULL 
-                    END
-                    """,
-                    [],
-                )
-            )
-            .filter(slug_number__gt=current_slug_number)
-            .order_by("slug_number")
-            .first()
-        )
-        if next_chapter:
-            return SimpleChapterSerializer(next_chapter).data
+        for slug_number, _, chapter in self.get_ordered_chapters(obj):
+            if slug_number > current_slug_number:
+                return SimpleChapterSerializer(chapter).data
+
         return None
 
     def get_previous(self, obj):
-        previous_chapter = (
-            Chapter.objects.filter(manhwa=obj.manhwa, id__lt=obj.id)
-            .annotate(
-                slug_number=RawSQL(
-                    """
-                    CASE 
-                        WHEN slug ~ '[0-9]+' 
-                        THEN CAST(
-                            (SELECT REGEXP_MATCHES(slug, '[0-9]+'))[1] 
-                            AS INTEGER
-                        ) 
-                        ELSE NULL 
-                    END
-                    """,
-                    [],
-                )
-            )
-            .order_by("-slug_number")
-            .first()
-        )
+        current_slug_number = self.get_slug_number(obj.slug)
+        if current_slug_number is None:
+            return None
+
+        previous_chapter = None
+
+        for slug_number, _, chapter in self.get_ordered_chapters(obj):
+            if slug_number >= current_slug_number:
+                break
+            previous_chapter = chapter
+
         if previous_chapter:
             return SimpleChapterSerializer(previous_chapter).data
+
         return None
 
     class Meta:

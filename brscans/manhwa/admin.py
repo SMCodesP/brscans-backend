@@ -22,6 +22,35 @@ class ManhwaAdmin(admin.ModelAdmin):
     search_fields = ("title",)
     raw_id_fields = ("thumbnail",)
     filter_horizontal = ("genres",)
+    fieldsets = (
+        (None, {"fields": ("title", "author", 
+        # "status",
+         "description")}),
+        (
+            "External Information",
+            {
+                "fields": (
+                    "external_id",
+                    # "slug",
+                    "hash_external_id",
+                    # "hash_slug",
+                    "source",
+                    "identifier",
+                )
+            },
+        ),
+        (
+            "Original Information",
+            {
+                "fields": (
+                    "original_title",
+                    "original_description",
+                )
+            },
+        ),
+        ("NSFW", {"fields": ("is_nsfw",)}),
+        ("Genres and Thumbnail", {"fields": ("genres", "thumbnail")}),
+    )
 
 
 # # 2790 49716

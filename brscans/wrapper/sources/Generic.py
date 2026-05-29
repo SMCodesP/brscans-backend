@@ -73,7 +73,8 @@ class Generic:
     @staticmethod
     def chapters(manhwa: Manhwa):
         response = Generic.scraper.post(
-            manhwa.source + "/ajax/chapters", headers={"Referer": manhwa.source}
+            manhwa.source.rstrip("/") + "/ajax/chapters",
+            headers={"Referer": manhwa.source},
         )
         html = response.text
 

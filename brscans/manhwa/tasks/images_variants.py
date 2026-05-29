@@ -166,3 +166,40 @@ def process_image_variant_minimum(id: int, folder: str):
         variant.save()
 
     return {"Message": "Image variant minimum created successfully."}
+
+
+@task
+def process_image_fill_from_mongo(variant_id: int):
+    from pymongo import MongoClient
+    import httpx
+    
+    mongo_client = MongoClient("mongodb+srv://smcodes:8HmPrzJpJT5AiOR5@brscans-ia.lf9osoc.mongodb.net/?retryWrites=true&w=majority&appName=brscans-ia")
+    db = mongo_client["brscans-ia"]
+    collection = db["blk_list"]
+    
+    doc = collection.find_one({"image_id": variant_id})
+    if not doc:
+        print(f"Documento nao encontrado no MongoDB para variant_id {variant_id}")
+        return {"Message": "No blk_list found in MongoDB."}
+    
+    # Executa o post direto para o fill de tradução na AWS
+    try:
+        response = httpx.post(
+            "https://9r4cs6g8pc.execute-api.sa-east-1.amazonaws.com/dev",
+            json={
+                "blk_list": doc["blk_list"],
+                "prompt": doc["prompt"],
+                "new_message": doc["new_message"],
+                "folder": doc["folder"],
+                "path_raw": doc["path_raw"],
+                "context_path": doc["context_path"],
+                "id": doc["image_id"],
+            },
+            timeout=1,
+        )
+        print(f"Post de fallback para brscans-fill disparado. Status: {response.status_code}")
+    except Exception as e:
+        print("Erro ao disparar post de fallback para brscans-fill:", e)
+        pass
+
+    return {"Message": "Fallback fill triggered."}

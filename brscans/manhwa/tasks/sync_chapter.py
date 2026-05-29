@@ -6,6 +6,7 @@ from brscans.manhwa.tasks.images_variants import (
     merge_batch_original,
     merge_pages_original,
     process_image_translate,
+    process_image_fill_from_mongo,
 )
 from brscans.utils.image import (
     batch_images_with_split,
@@ -69,15 +70,39 @@ def fix_pages(chapter_id: dict):
         original__isnull=False,
     )
 
+    # Conectar ao MongoDB para verificar se já temos o blk_list salvo
+    has_mongodb_fallback = False
+    try:
+        from pymongo import MongoClient
+        mongo_client = MongoClient("mongodb+srv://smcodes:8HmPrzJpJT5AiOR5@brscans-ia.lf9osoc.mongodb.net/?retryWrites=true&w=majority&appName=brscans-ia")
+        db = mongo_client["brscans-ia"]
+        collection = db["blk_list"]
+        has_mongodb_fallback = True
+    except Exception as e:
+        print("Erro ao inicializar MongoDB no fix_pages:", e)
+
     for variant in variants:
         if variant.original:
-            print("Iniciando tradução")
-            process_image_translate(
-                variant.pk,
-                variant.original.url,
-                ["chapters", str(chapter_records.pk)],
-                chapter_records.manhwa.pk,
-            )
+            # Tenta fallback via MongoDB
+            fallback_found = False
+            if has_mongodb_fallback:
+                try:
+                    doc = collection.find_one({"image_id": variant.pk})
+                    if doc:
+                        print(f"Encontrou blk_list no MongoDB para variant {variant.pk}. Continuando a partir do fill...")
+                        process_image_fill_from_mongo(variant.pk)
+                        fallback_found = True
+                except Exception as e:
+                    print(f"Erro ao verificar fallback MongoDB para variant {variant.pk}:", e)
+
+            if not fallback_found:
+                print("Iniciando tradução (do zero via Modal)")
+                process_image_translate(
+                    variant.pk,
+                    variant.original.url,
+                    ["chapters", str(chapter_records.pk)],
+                    chapter_records.manhwa.pk,
+                )
         else:
             print("Variante sem original")
 

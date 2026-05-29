@@ -32,7 +32,51 @@ def get_referer_from_url(url: str) -> str:
     # Para CDNs do MangaBuddy, usar mangabuddy.com como referer
     if "mbcdn" in parsed.netloc or "mangabuddy" in parsed.netloc:
         return "https://mangabuddy.com/"
+    if "mgread" in parsed.netloc or "mgread.io" in parsed.netloc:
+        return "https://mangayy.org/"
+    if "madaradex" in parsed.netloc or "madaradex.org" in parsed.netloc:
+        return "https://madaradex.org/"
     return f"{parsed.scheme}://{parsed.netloc}/"
+
+
+_madaradex_cookies = None
+
+
+def get_madaradex_cookies():
+    global _madaradex_cookies
+    if _madaradex_cookies is not None:
+        return _madaradex_cookies
+
+    try:
+        import secrets
+        fp_value = secrets.token_hex(16)
+        session = requests.Session()
+        session.cookies.set("mdx_fp", fp_value, domain=".madaradex.org", path="/")
+
+        headers_post = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://madaradex.org/",
+            "Origin": "https://madaradex.org",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        }
+
+        r_post = session.post(
+            "https://madaradex.org/wp-admin/admin-ajax.php",
+            data={"action": "mdx_auth_refresh"},
+            headers=headers_post,
+            timeout=10,
+        )
+        if r_post.status_code == 200:
+            cookies = session.cookies.get_dict()
+            if "mdx_auth" in cookies:
+                _madaradex_cookies = "; ".join(
+                    [f"{k}={v}" for k, v in cookies.items()]
+                )
+                return _madaradex_cookies
+    except Exception as e:
+        print(f"Erro ao buscar cookies do madaradex: {e}")
+
+    return None
 
 
 def download_image(url, headers=None):
@@ -44,6 +88,11 @@ def download_image(url, headers=None):
             "Referer": get_referer_from_url(normalized_url),
             "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         }
+
+        if "madaradex.org" in normalized_url:
+            cookies_str = get_madaradex_cookies()
+            if cookies_str:
+                default_headers["Cookie"] = cookies_str
 
         if headers:
             default_headers.update(headers)
