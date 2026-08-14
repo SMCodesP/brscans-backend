@@ -1,6 +1,6 @@
 from os.path import join
 from uuid import uuid4
-from zappa.asynchronous import task
+from brscans.utils.tasks import task
 import httpx
 
 from brscans.manhwa.models import Chapter, Page

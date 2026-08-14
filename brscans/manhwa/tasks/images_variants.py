@@ -6,7 +6,7 @@ from uuid import uuid4
 import httpx
 from django.conf import settings
 from django.core.files.base import ContentFile
-from zappa.asynchronous import task
+from brscans.utils.tasks import task
 
 from brscans.manhwa.models import ImageVariants, Page
 from brscans.utils.generate_presigned_url import generate_presigned_url

@@ -3,7 +3,7 @@ import re
 import time
 
 from openai import OpenAI
-from zappa.asynchronous import task
+from brscans.utils.tasks import task
 
 from brscans.manhwa.models import Manhwa
 

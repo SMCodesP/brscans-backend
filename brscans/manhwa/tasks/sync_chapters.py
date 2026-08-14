@@ -1,4 +1,4 @@
-from zappa.asynchronous import task
+from brscans.utils.tasks import task
 
 from brscans.manhwa.models import Chapter, Manhwa
 from brscans.manhwa.tasks.sync_chapter import sync_chapter

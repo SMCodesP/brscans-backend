@@ -234,10 +234,15 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         
         print("Quantidade de paginas para serem traduzidas", sum_all)
 
-        for chapter in chapters[:20]:
+        for chapter in chapters[:10]:
             fix_pages(chapter.pk)
 
         return Response({"count": sum_all})
+
+    @action(detail=False, methods=["get"], url_path="tasks-status")
+    def tasks_status(self, request):
+        from brscans.utils.tasks import get_local_tasks_status
+        return Response(get_local_tasks_status())
 
     @action(detail=True, methods=["get"])
     def count_pages_original(self, request, pk=None):

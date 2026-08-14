@@ -31,6 +31,8 @@ SECRET_KEY = (
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 PRODUCTION = os.environ.get("PRODUCTION", "False") == "True"
+USE_ZAPPA_TASKS = False
+LOCAL_TASK_MAX_WORKERS = 15
 
 USE_S3 = True
 ALLOWED_HOSTS = [

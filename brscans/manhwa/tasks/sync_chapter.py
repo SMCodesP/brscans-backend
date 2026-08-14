@@ -1,5 +1,5 @@
 from django.db.models import Q
-from zappa.asynchronous import task
+from brscans.utils.tasks import task
 
 from brscans.manhwa.models import Chapter, ImageVariants, Page
 from brscans.manhwa.tasks.images_variants import (
