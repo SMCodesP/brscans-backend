@@ -6,7 +6,6 @@ from uuid import uuid4
 import httpx
 from django.conf import settings
 from django.core.files.base import ContentFile
-from brscans.utils.tasks import task
 
 from brscans.manhwa.models import ImageVariants, Page
 from brscans.utils.generate_presigned_url import generate_presigned_url
@@ -15,8 +14,10 @@ from brscans.utils.image import (
     download_images,
     process_merge_images,
 )
+from brscans.utils.image_contract import image_destination
 from brscans.utils.image_url import image_url
 from brscans.utils.resize_image import resize_image
+from brscans.utils.tasks import task
 
 
 @task
@@ -95,7 +96,7 @@ def add_original_image_variant(
         image = image_url(url, filename)
         image.content_type = "image/webp"
         variant.original.save(join(*folder, filename), image)
-        new_url = variant.original.url
+        new_url = variant.original.url  # noqa: F841 - retained for disabled hook
         # if translate:
         #     process_image_translate(variant.id, new_url, folder)
 
@@ -106,11 +107,12 @@ def add_original_image_variant(
 
 @task
 def process_image_translate(id, url: str, folder: str, main_id: str = None):
-    filename = f"{uuid4().hex}.jpeg"
-    path = join(*folder, "raw", filename)
+    path, content_type = image_destination(
+        folder, "raw", uuid4().hex, "image/webp"
+    )
     presign = generate_presigned_url(
         join(settings.PUBLIC_MEDIA_LOCATION, path),
-        {"type": "image/jpeg"},
+        {"type": content_type},
     )
     try:
         httpx.post(
@@ -170,18 +172,22 @@ def process_image_variant_minimum(id: int, folder: str):
 
 @task
 def process_image_fill_from_mongo(variant_id: int):
-    from pymongo import MongoClient
     import httpx
-    
-    mongo_client = MongoClient("mongodb+srv://smcodes:8HmPrzJpJT5AiOR5@brscans-ia.lf9osoc.mongodb.net/?retryWrites=true&w=majority&appName=brscans-ia")
+    from pymongo import MongoClient
+
+    mongo_client = MongoClient(
+        "mongodb+srv://smcodes:8HmPrzJpJT5AiOR5@brscans-ia.lf9osoc.mongodb.net/?retryWrites=true&w=majority&appName=brscans-ia"
+    )
     db = mongo_client["brscans-ia"]
     collection = db["blk_list"]
-    
+
     doc = collection.find_one({"image_id": variant_id})
     if not doc:
-        print(f"Documento nao encontrado no MongoDB para variant_id {variant_id}")
+        print(
+            f"Documento nao encontrado no MongoDB para variant_id {variant_id}"
+        )
         return {"Message": "No blk_list found in MongoDB."}
-    
+
     # Executa o post direto para o fill de tradução na AWS
     try:
         response = httpx.post(
@@ -197,7 +203,9 @@ def process_image_fill_from_mongo(variant_id: int):
             },
             timeout=1,
         )
-        print(f"Post de fallback para brscans-fill disparado. Status: {response.status_code}")
+        print(
+            f"Post de fallback para brscans-fill disparado. Status: {response.status_code}"
+        )
     except Exception as e:
         print("Erro ao disparar post de fallback para brscans-fill:", e)
         pass
