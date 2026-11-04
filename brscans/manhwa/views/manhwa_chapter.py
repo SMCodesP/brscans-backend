@@ -4,12 +4,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from brscans.manhwa.models import Chapter
-from brscans.manhwa.serializers import ChapterSerializer, SimpleChapterSerializer
+from brscans.manhwa.serializers import (
+    ChapterSerializer,
+    SimpleChapterSerializer,
+    with_quantity_merged,
+)
 from brscans.manhwa.tasks.sync_chapter import fix_pages
-from brscans.manhwa.tasks.upscale import upscale_pages
-from brscans.wrapper.sources import get_source_by_link
-from brscans.wrapper.sources.Generic import Generic
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 
 class ManhwaChapterViewSet(viewsets.ModelViewSet):
@@ -18,7 +18,9 @@ class ManhwaChapterViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return (
-            Chapter.objects.filter(manhwa=self.kwargs["manhwa_pk"])
+            with_quantity_merged(
+                Chapter.objects.filter(manhwa=self.kwargs["manhwa_pk"])
+            )
             .annotate(
                 slug_number=RawSQL(
                     """
@@ -47,17 +49,3 @@ class ManhwaChapterViewSet(viewsets.ModelViewSet):
 
         fix_pages(chapter.pk)
         return Response({"status": "fixed"})
-
-    @action(detail=True, methods=["get"])
-    def teste(self, request, manhwa_pk=None, pk=None):
-        chapter = Chapter.objects.get(manhwa=manhwa_pk, pk=pk)
-
-        Source: Generic = get_source_by_link(chapter.source)
-        chapter = Source.chapter(chapter.source)
-        return Response(chapter)
-
-    @action(detail=True, methods=["get"])
-    def upscale(self, request, manhwa_pk=None, pk=None):
-        chapter = Chapter.objects.get(manhwa=manhwa_pk, pk=pk)
-        upscale_pages(chapter.pk)
-        return Response({"status": "upscaled"})

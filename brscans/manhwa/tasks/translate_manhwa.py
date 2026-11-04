@@ -2,13 +2,14 @@ import json
 import re
 import time
 
+from django.conf import settings
 from openai import OpenAI
 from brscans.utils.tasks import task
 
 from brscans.manhwa.models import Manhwa
 
 client = OpenAI(
-    api_key="sk-f9a18faeb596425886f17afac4325c38",
+    api_key=settings.DS2API_API_KEY,
     base_url="https://ds2api-codes.vercel.app/v1",
 )
 

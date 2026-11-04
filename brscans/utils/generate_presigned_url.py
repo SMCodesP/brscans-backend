@@ -11,6 +11,6 @@ def generate_presigned_url(key: str, file: dict):
             {"Content-Type": file.get("type", "")},
             ["content-length-range", 0, settings.MAX_UPLOAD_SIZE],
         ],
-        ExpiresIn=3600,
+        ExpiresIn=43200,  # a página pode esperar horas na fila do tradutor
     )
     return {"url": response["url"], "fields": response["fields"]}

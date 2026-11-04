@@ -1,4 +1,5 @@
 import re
+
 from cloudscraper import CloudScraper
 from slugify import slugify
 from unidecode import unidecode
@@ -6,6 +7,7 @@ import httpx
 from bs4 import BeautifulSoup, ResultSet, Tag
 
 from brscans.wrapper.sources.Generic import Generic
+from brscans.wrapper.sources.KingOfShojo import KingOfShojo
 from brscans.manhwa.models import Chapter, Manhwa
 
 
@@ -17,6 +19,12 @@ class RizzFables(Generic):
         self.url = url
         self.client = httpx.Client(timeout=None)
         self.name = "RizzFables"
+
+    def search(self, query: str):
+        """Tema "king" (BSX), o mesmo card do KingOfShojo."""
+        return KingOfShojo.cards(
+            self.client.get(self.url, params={"s": query}).text, self.url + "/"
+        )
 
     @staticmethod
     def info(url, capthers: bool = False):

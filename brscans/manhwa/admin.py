@@ -18,14 +18,12 @@ class ChapterAdmin(admin.ModelAdmin):
 class ManhwaAdmin(admin.ModelAdmin):
     list_display = ("title", "source", "thumbnail")
     list_select_related = ("thumbnail",)
-    list_filter = ("source",)
+    list_filter = ("status", "source")
     search_fields = ("title",)
     raw_id_fields = ("thumbnail",)
     filter_horizontal = ("genres",)
     fieldsets = (
-        (None, {"fields": ("title", "author", 
-        # "status",
-         "description")}),
+        (None, {"fields": ("title", "author", "status", "description")}),
         (
             "External Information",
             {

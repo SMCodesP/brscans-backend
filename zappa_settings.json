@@ -8,7 +8,18 @@
             "botocore",
             "s3transfer",
             "concurrent",
-            ".env"
+            ".env",
+            "db.sqlite3",
+            "icon.png",
+            "tests",
+            "poc",
+            ".ruff_cache",
+            "__pycache__",
+            "*.pyc",
+            "static",
+            ".venv",
+            "black",
+            "blib2to3"
         ],
         "profile_name": "brscans",
         "project_name": "brscans-backend",
@@ -18,10 +29,31 @@
             "CLOUDFRONT_DOMAIN": "d47sf0ah3vbtc.cloudfront.net",
             "PRODUCTION": "True",
             "S3_STATIC_BUCKET": "brscans-media",
-            "S3_REGION": "sa-east-1"
+            "S3_REGION": "sa-east-1",
+            "TASK_FUNCTION_NAME": "brscans-backend-worker"
         },
         "timeout_seconds": 900,
-        "memory_size": 3008,
-        "keep_warm": false
+        "memory_size": 512,
+        "keep_warm": false,
+        "log_level": "WARNING",
+        "debug": false,
+        "architecture": "arm64",
+        "apigateway_version": "v2"
+    },
+    "cron": {
+        "extends": "dev",
+        "memory_size": 512,
+        "apigateway_enabled": false,
+        "events": [
+            {
+                "function": "brscans.manhwa.tasks.sync_workers.handler",
+                "expression": "rate(2 hours)"
+            }
+        ]
+    },
+    "worker": {
+        "extends": "dev",
+        "memory_size": 1024,
+        "apigateway_enabled": false
     }
 }

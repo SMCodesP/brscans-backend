@@ -1,6 +1,5 @@
 from hashlib import sha256
 
-from django.db.models import Q
 from django.utils.datetime_safe import datetime
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -11,18 +10,21 @@ from brscans.manhwa.models import Chapter, ReadChapter
 from brscans.manhwa.serializers import (
     ChapterNextPreviousSerializer,
     ChapterSerializer,
+    with_quantity_merged,
 )
-from brscans.manhwa.tasks.images_variants import (
-    merge_pages_original,
-    process_image_translate,
-)
+from brscans.manhwa.tasks.images_variants import merge_pages_original
+from brscans.manhwa.tasks.panel import panel_fix_chapter
 from brscans.pagination import TotalPagination
 from brscans.wrapper.sources.Generic import Generic
 
 
 class ChapterViewSet(viewsets.ModelViewSet):
     serializer_class = ChapterSerializer
-    queryset = Chapter.objects.all().prefetch_related("pages", "pages__images")
+    queryset = (
+        with_quantity_merged(Chapter.objects.all())
+        .prefetch_related("pages", "pages__images")
+        .select_related("manhwa")
+    )
     pagination_class = TotalPagination
 
     def retrieve(self, request, *args, **kwargs):
@@ -31,28 +33,11 @@ class ChapterViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def fix(self, request, pk):
+        """Mesma entrada do botão do painel, agora fora da requisição: reparar
+        dentro da API estoura o Gateway e repete o trabalho a cada clique."""
         chapter = Chapter.objects.get(pk=pk)
-        pages = chapter.pages.filter(
-            Q(images__isnull=True)
-            | Q(images__translated__isnull=True)
-            | Q(images__original__isnull=True)
-            | Q(images__original="")
-            | Q(images__translated="")
-        )
-
-        for page in pages:
-            variants = page.images
-            process_image_translate(
-                variants.pk,
-                variants.original.url,
-                [
-                    "chapters",
-                    str(chapter.pk),
-                ],
-                chapter.manhwa.pk,
-            )
-
-        return Response({"status": "ok"})
+        panel_fix_chapter(chapter.pk)
+        return Response({"status": "queued"}, status=202)
 
     @action(detail=True, methods=["post"], url_path="mark-read")
     def mark_read(self, request, pk=None):
@@ -71,8 +56,9 @@ class ChapterViewSet(viewsets.ModelViewSet):
         identifier = sha256(link.encode("utf-8")).hexdigest()
 
         chapter = (
-            Chapter.objects.filter(identifier=identifier)
+            with_quantity_merged(Chapter.objects.all())
             .prefetch_related("pages", "pages__images")
+            .filter(identifier=identifier)
             .first()
         )
 

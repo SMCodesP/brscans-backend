@@ -11,6 +11,9 @@ class ImageVariants(models.Model):
     translated = models.ImageField(blank=True, null=True)
     raw = models.ImageField(blank=True, null=True)
     upscaled = models.ImageField(blank=True, null=True)
+    # editado à mão no painel: guarda o translated anterior e marca a origem
+    previous_translated = models.CharField(max_length=255, null=True, blank=True)
+    manual_translated = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if self.translated and self.translated.name.startswith(
@@ -30,10 +33,31 @@ class Genre(models.Model):
         return self.name
 
 
+class SourceStatus(models.TextChoices):
+    OK = "ok", "OK"
+    REDIRECTED = "redirected", "Domínio mudou (redireciona)"
+    NOT_FOUND = "not_found", "Não encontrado (404)"
+    DEAD = "dead", "Domínio morto (DNS/TLS)"
+    OFFLINE = "offline", "Fora do ar (403/503 sem challenge)"
+    BLOCKED = "blocked", "Bloqueado (captcha/403/429)"
+    HTTP_ERROR = "http_error", "Erro HTTP"
+    TIMEOUT = "timeout", "Timeout"
+    PARSER_ERROR = "parser_error", "Parser quebrado"
+    NO_URL = "no_url", "Sem URL"
+
+
+class ManhwaStatus(models.TextChoices):
+    ONGOING = "ongoing", "Em andamento"
+    COMPLETED = "completed", "Completo"
+
+
 class Manhwa(models.Model):
     title = models.CharField(max_length=100)
     author = models.CharField(max_length=100, blank=True, null=True)
-    status = models.CharField(max_length=100)
+    # completed: a obra acabou, sync_chapters não busca mais capítulos
+    status = models.CharField(
+        max_length=20, choices=ManhwaStatus.choices, default=ManhwaStatus.ONGOING
+    )
     description = models.TextField()
     external_id = models.CharField(max_length=64, db_index=True, null=True)
     slug = models.SlugField(max_length=64, db_index=True, null=True)
@@ -51,6 +75,14 @@ class Manhwa(models.Model):
 
     is_nsfw = models.BooleanField(default=False)
 
+    source_status = models.CharField(  # null = nunca checado
+        max_length=32, choices=SourceStatus.choices, null=True, blank=True
+    )
+    source_detail = models.TextField(blank=True, default="")
+    source_checked_at = models.DateTimeField(null=True, blank=True)
+    source_http = models.PositiveSmallIntegerField(null=True, blank=True)
+    source_chapters = models.IntegerField(null=True, blank=True)  # nº na fonte
+
     genres = models.ManyToManyField(Genre, related_name="manhwas", blank=True)
 
     def __str__(self):
@@ -58,6 +90,13 @@ class Manhwa(models.Model):
 
 
 class Chapter(models.Model):
+    WORK_STATUS_CHOICES = (
+        ("pending", "Pendente"),
+        ("running", "Em andamento"),
+        ("done", "Concluído"),
+        ("desisted", "Desistiu"),
+    )
+
     identifier = models.CharField(max_length=255, null=True, unique=True)
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, db_index=True)
@@ -70,6 +109,23 @@ class Chapter(models.Model):
 
     source = models.URLField(null=True, blank=True)
 
+    work_status = models.CharField(
+        max_length=16,
+        choices=WORK_STATUS_CHOICES,
+        default="pending",
+        db_index=True,
+    )
+    work_attempts = models.PositiveSmallIntegerField(default=0)
+    work_locked_until = models.DateTimeField(  # lease da trava, expira sozinha
+        null=True, blank=True, db_index=True
+    )
+    work_next_attempt_at = models.DateTimeField(  # null = pode agora (backoff)
+        null=True, blank=True, db_index=True
+    )
+    work_last_error = models.TextField(null=True, blank=True)
+    work_missing_pages = models.PositiveIntegerField(null=True, blank=True)
+    discord_notified = models.BooleanField(default=False)
+
 
 class Page(models.Model):
     chapter = models.ForeignKey(
@@ -80,6 +136,14 @@ class Page(models.Model):
     )
     order = models.PositiveIntegerField(default=0)
     quantity_merged = models.IntegerField(null=True)
+
+    # Reparo por página: desistência é derivada (work_attempts >= limite), sem
+    # coluna de status; a chegada de `translated` é a única conclusão.
+    work_attempts = models.PositiveSmallIntegerField(default=0)
+    work_next_attempt_at = models.DateTimeField(
+        null=True, blank=True, db_index=True
+    )
+    work_last_error = models.TextField(null=True, blank=True)
 
     class Meta:
         ordering = ["order"]

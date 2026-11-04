@@ -3,6 +3,7 @@ import os
 import requests
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db.models import Prefetch
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
@@ -16,7 +17,8 @@ from brscans.authentication.serializers import (
     RegisterSerializer,
     UserSerializer,
 )
-from brscans.manhwa.serializers import ManhwaSerializer
+from brscans.manhwa.models import Chapter, Manhwa
+from brscans.manhwa.serializers import ManhwaSerializer, with_quantity_merged
 
 DISCORD_API_URL = "https://discord.com/api/v10"
 
@@ -194,7 +196,18 @@ def favorites_list_view(request):
     favorites = Favorite.objects.filter(user=request.user).select_related(
         "manhwa__thumbnail"
     )
-    manhwas = [f.manhwa for f in favorites]
+    manhwas = (
+        Manhwa.objects.filter(favorites__in=favorites)
+        .select_related("thumbnail")
+        .prefetch_related(
+            "genres",
+            Prefetch(
+                "chapters",
+                queryset=with_quantity_merged(Chapter.objects.all()),
+            ),
+        )
+        .order_by("-id")
+    )
     return Response(ManhwaSerializer(manhwas, many=True).data)
 
 

@@ -12,9 +12,7 @@ from rest_framework.response import Response
 from brscans.manhwa.models import (
     Chapter,
     Genre,
-    ImageVariants,
     Manhwa,
-    Page,
     ReadChapter,
     ReadingHistory,
 )
@@ -24,27 +22,27 @@ from brscans.manhwa.serializers import (
     ManhwaDetailSerializer,
     ManhwaSerializer,
     RecentChapterSerializer,
+    with_quantity_merged,
 )
-from brscans.manhwa.tasks.images_variants import add_original_image_variant
-from brscans.manhwa.tasks.sync_chapter import (
-    fix_pages,
-    sync_chapter,
-    sync_missing_original_pages,
-)
+from brscans.manhwa.tasks.sync_chapter import sync_chapter
 from brscans.manhwa.tasks.sync_chapters import sync_chapters
+from brscans.manhwa.tasks.sync_workers import repair_pages
+from brscans.manhwa.work import (
+    pending_counts_bulk,
+    process_chapter,
+)
 from brscans.pagination import TotalPaginationManhwa
-
-# from brscans.utils.anime4k import Anime4k
-from brscans.wrapper import sources
-from brscans.wrapper.sources.Generic import Generic
 
 
 class ManhwaViewSet(viewsets.ModelViewSet):
+    # O prefetch anotado de capítulos só entra em `list`: o cache de `chapters`
+    # é compartilhado com `latest_chapters`, e num queryset global ele
+    # carregaria todos os capítulos (e páginas) de todas as manhwas.
     queryset = (
         Manhwa.objects.all()
         .order_by("-id")
         .select_related("thumbnail")
-        .prefetch_related("genres", "chapters")
+        .prefetch_related("genres")
     )
     serializer_class = ManhwaSerializer
     pagination_class = TotalPaginationManhwa
@@ -70,15 +68,23 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 .order_by("-latest_activity", "-id")
             )
 
-        self.queryset = queryset
+        # `latest_chapters` lê o cache de `chapters`; anotado, é 1 SUM por
+        # manhwa em vez de 2 aggregate avulsos por item da página.
+        self.queryset = queryset.prefetch_related(
+            Prefetch(
+                "chapters", queryset=with_quantity_merged(Chapter.objects.all())
+            )
+        )
         return super().list(request, *args, **kwargs)
 
     def retrieve(self, request, *args, **kwargs):
-        self.queryset = self.queryset.prefetch_related(None).prefetch_related(
+        # O detalhe não usa chapter.pages (o front busca o capítulo na leitura),
+        # por isso não há prefetch de páginas aqui.
+        self.queryset = self.queryset.prefetch_related(
             "genres",
             Prefetch(
                 "chapters",
-                queryset=Chapter.objects.all()
+                queryset=with_quantity_merged(Chapter.objects.all())
                 .annotate(
                     slug_number=RawSQL(
                         """
@@ -96,8 +102,6 @@ class ManhwaViewSet(viewsets.ModelViewSet):
                 )
                 .order_by("slug_number"),
             ),
-            "chapters__pages",
-            "chapters__pages__images",
         )
         self.serializer_class = ManhwaDetailSerializer
         return super().retrieve(request, *args, **kwargs)
@@ -106,13 +110,24 @@ class ManhwaViewSet(viewsets.ModelViewSet):
     def search(self, request):
         query = request.GET.get("query") or ""
 
-        manhwas = Manhwa.objects.filter(
-            Q(title__icontains=query)
-            | Q(description__icontains=query)
-            | Q(author__icontains=query)
-            | Q(genres__name__icontains=query)
-            | Q(source__icontains=query)
-        ).distinct()
+        manhwas = (
+            Manhwa.objects.filter(
+                Q(title__icontains=query)
+                | Q(description__icontains=query)
+                | Q(author__icontains=query)
+                | Q(genres__name__icontains=query)
+                | Q(source__icontains=query)
+            )
+            .distinct()
+            .select_related("thumbnail")
+            .prefetch_related(
+                "genres",
+                Prefetch(
+                    "chapters",
+                    queryset=with_quantity_merged(Chapter.objects.all()),
+                ),
+            )
+        )
 
         serializer = ManhwaSerializer(manhwas, many=True)
         return Response(serializer.data)
@@ -141,7 +156,13 @@ class ManhwaViewSet(viewsets.ModelViewSet):
             Manhwa.objects.filter(is_nsfw=False)
             .annotate(read_count=Count("read_chapters"))
             .select_related("thumbnail")
-            .prefetch_related("genres")
+            .prefetch_related(
+                "genres",
+                Prefetch(
+                    "chapters",
+                    queryset=with_quantity_merged(Chapter.objects.all()),
+                ),
+            )
             .order_by("-read_count", "-id")[:limit]
         )
         serializer = ManhwaSerializer(manhwas, many=True)
@@ -186,7 +207,17 @@ class ManhwaViewSet(viewsets.ModelViewSet):
         limit = int(request.query_params.get("limit", 10))
         history = (
             ReadingHistory.objects.filter(user=request.user)
-            .select_related("manhwa", "manhwa__thumbnail", "chapter")
+            .select_related("manhwa", "manhwa__thumbnail")
+            .prefetch_related(
+                Prefetch(
+                    "chapter",
+                    queryset=with_quantity_merged(Chapter.objects.all()),
+                ),
+                Prefetch(
+                    "manhwa__chapters",
+                    queryset=with_quantity_merged(Chapter.objects.all()),
+                ),
+            )
             .order_by("-updated_at")[:limit]
         )
 
@@ -212,190 +243,40 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def count_fix_caps(self, request, pk=None):
-        chapters = Chapter.objects.filter(
-            (
-                Q(pages__isnull=True)
-                | Q(pages__images__isnull=True)
-                | Q(pages__images__translated__isnull=True)
-                | Q(pages__images__translated="")
-            ),
-            manhwa=pk,
-            pages__images__original__isnull=False,
-        ).distinct()
+        """Reparo manual (override): re-arma desistidos e ignora o backoff.
 
-        sum_all = 0
-        for chapter in chapters:
-            variants_count = ImageVariants.objects.filter(
-                Q(translated__isnull=True) | Q(translated=""),
-                page__chapter=chapter,
-                original__isnull=False,
-            ).count()
-            sum_all += variants_count
-        
-        print("Quantidade de paginas para serem traduzidas", sum_all)
-
-        for chapter in chapters[:10]:
-            fix_pages(chapter.pk)
-
-        return Response({"count": sum_all})
-
-    @action(detail=False, methods=["get"], url_path="tasks-status")
-    def tasks_status(self, request):
-        from brscans.utils.tasks import get_local_tasks_status
-        return Response(get_local_tasks_status())
-
-    @action(detail=True, methods=["get"])
-    def count_pages_original(self, request, pk=None):
-        page = Page.objects.filter(chapter__manhwa=pk).filter(
-            (Q(images__original__isnull=True) | Q(images__original="")),
+        Passa pela mesma trava/backoff/desistência do cron (`process_page` por
+        página), só que com `force`. Continua respeitando a trava do capítulo
+        de quem já está sendo processado — senão o botão duplicaria.
+        """
+        chapters = list(
+            Chapter.objects.filter(manhwa=pk, pages__isnull=False).distinct()
         )
+        counts = pending_counts_bulk([chapter.pk for chapter in chapters])
+        pending = {
+            chapter.pk: counts[chapter.pk][1]  # sem tradução
+            for chapter in chapters
+        }
+        count = sum(pending.values())
 
-        return Response({"count": page.count()})
+        outcomes = {}
+        for chapter in chapters[:80]:
+            if not pending[chapter.pk]:
+                continue
+            outcome = process_chapter(
+                chapter,
+                lambda ch, needs_sync: repair_pages(ch.pk, force=True),
+                force=True,
+            )
+            outcomes[outcome] = outcomes.get(outcome, 0) + 1
 
-    @action(detail=True, methods=["get"])
-    def count_pages_to_fix(self, request, pk=None):
-        page = Page.objects.filter(
-            (
-                Q(images__isnull=True)
-                | Q(images__translated__isnull=True)
-                | Q(images__translated="")
-            ),
-        )
-
-        return Response({"count": page.count()})
-
-    @action(detail=True, methods=["get"])
-    def sync(self, request, pk=None):
-        limit = request.query_params.get("limit", "5")
-        manhwa = Manhwa.objects.get(pk=pk)
-        sync_chapters(manhwa.pk, int(limit))
-        serializer = self.serializer_class(manhwa)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=["get"])
-    def delete_chapter(self, request, pk=None):
-        manhwa = Manhwa.objects.get(pk=pk)
-        chapters = Chapter.objects.filter(manhwa=manhwa)
-        chapters.delete()
-        return Response({"message": "Chapter deleted successfully."})
-
-    @action(detail=True, methods=["get"])
-    def fix_caps(self, request, pk=None):
-        chapters = Chapter.objects.filter(
-            (
-                Q(pages__images__original__isnull=True)
-                | Q(pages__images__original="")
-            ),
-            manhwa=pk,
-        ).distinct()[:20]
-
-        for chapter in chapters:
-            chapter.pages.all().delete()
-            sync_chapter(chapter.pk, pk)
-
-        serializer_data = ChapterSerializer(chapters, many=True).data
+        print("Quantidade de paginas para serem traduzidas", count)
 
         return Response(
             {
-                "message": f"Corrigindo {chapters.count()} capítulos.",
-                "data": serializer_data,
-            }
-        )
-
-    @action(detail=True, methods=["get"])
-    def sync_missing_pages(self, request, pk=None):
-        """
-        Sincroniza páginas sem variant original.
-        Faz o fetch novamente do capítulo e processa apenas as páginas faltantes.
-        """
-        # Buscar capítulos com páginas sem original
-        chapters = (
-            Chapter.objects.filter(manhwa=pk, pages__images__isnull=False)
-            .filter(
-                Q(pages__images__original__isnull=True)
-                | Q(pages__images__original="")
-            )
-            .distinct()
-        )
-
-        # Limitar para processar em lotes
-        limit = int(request.GET.get("limit", 10))
-        chapters = chapters[:limit]
-
-        results = []
-        for chapter in chapters:
-            sync_missing_original_pages(chapter.pk, pk)
-            results.append(
-                {
-                    "chapter_id": chapter.pk,
-                    "chapter_title": chapter.title,
-                }
-            )
-
-        return Response(
-            {
-                "message": f"Sincronizando páginas faltantes de {chapters.count()} capítulos",
-                "total_chapters": chapters.count(),
-                "results": results,
-            }
-        )
-
-    @action(detail=True, methods=["get"])
-    def count_missing_original_pages(self, request, pk=None):
-        """
-        Conta quantas páginas estão sem variant original.
-        """
-        # Contar páginas sem original neste manhwa
-        pages_without_original = (
-            Page.objects.filter(chapter__manhwa=pk)
-            .filter(Q(images__original__isnull=True) | Q(images__original=""))
-            .count()
-        )
-
-        # Contar capítulos afetados
-        chapters_affected = (
-            Chapter.objects.filter(manhwa=pk, pages__images__isnull=False)
-            .filter(
-                Q(pages__images__original__isnull=True)
-                | Q(pages__images__original="")
-            )
-            .distinct()
-            .count()
-        )
-
-        # Detalhes por capítulo (primeiros 10)
-        chapter_details = []
-        chapters = (
-            Chapter.objects.filter(manhwa=pk, pages__images__isnull=False)
-            .filter(
-                Q(pages__images__original__isnull=True)
-                | Q(pages__images__original="")
-            )
-            .distinct()[:10]
-        )
-
-        for chapter in chapters:
-            pages_missing = (
-                Page.objects.filter(chapter=chapter)
-                .filter(
-                    Q(images__original__isnull=True) | Q(images__original="")
-                )
-                .count()
-            )
-
-            chapter_details.append(
-                {
-                    "chapter_id": chapter.pk,
-                    "chapter_title": chapter.title,
-                    "pages_without_original": pages_missing,
-                }
-            )
-
-        return Response(
-            {
-                "total_pages_without_original": pages_without_original,
-                "total_chapters_affected": chapters_affected,
-                "sample_chapters": chapter_details,
+                "count": count,
+                "dispatched": outcomes.get("dispatched", 0),
+                "outcomes": outcomes,
             }
         )
 
@@ -414,55 +295,19 @@ class ManhwaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def download(self, request):
+        from brscans.manhwa.tasks.panel import create_manhwa
+
         link = request.query_params.get("link")
-        limit = request.query_params.get("limit", 5)
         identifier = sha256(link.encode("utf-8")).hexdigest()
+        limit = int(request.query_params.get("limit", 5))
 
         manhwa = Manhwa.objects.filter(identifier=identifier).first()
-
         if manhwa:
-            print("manhwa found")
-            sync_chapters(manhwa.pk, int(limit))
+            sync_chapters(manhwa.pk, limit)
+            return Response(self.serializer_class(manhwa).data)
 
-            serializer = self.serializer_class(manhwa)
-            return Response(serializer.data)
-
-        Source: Generic = sources.get_source_by_link(link)
-        print("Source", Source)
-        result = Source.info(link, capthers=False)
-        print("result", result)
-
-        id = str(result.get("id")).encode("utf-8")
-
-        manhwa = Manhwa.objects.create(
-            external_id=result.get("id"),
-            hash_external_id=sha256(id).hexdigest(),
-            title=result.get("title"),
-            slug=result.get("slug", None),
-            source=result.get("url"),
-            description=result.get("summary"),
-            identifier=identifier,
-        )
-        thumbnail = ImageVariants.objects.create()
-        manhwa.thumbnail = thumbnail
-        manhwa.save()
-
-        print(manhwa.pk)
-        add_original_image_variant(
-            thumbnail.pk,
-            result.get("image"),
-            ["chapters", str(manhwa.pk)],
-            False,
-        )
-        # translate_manhwa(manhwa.pk)
-        sync_chapters(manhwa.pk, int(limit))
-
-        return Response(self.serializer_class(manhwa).data)
-
-    # @action(detail=False, methods=["get"])
-    # def anime4k(self, request):
-    #     image = request.query_params.get("image")
-    #     anime4k = Anime4k()
-    #     path = anime4k.upscale_remote_image(image)
-
-    #     return FileResponse(open(path, "rb"), content_type="image/png")
+        result = create_manhwa(link, limit)
+        if not isinstance(result, dict):
+            # Dentro da Lambda o @task só enfileira o invoke.
+            return Response({"status": "queued"}, status=202)
+        return Response(result)

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,10 +30,15 @@ SECRET_KEY = (
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Com DEBUG=True o handler do Zappa devolve traceback nos 500, e a página de
+# erro do Django expõe settings/credenciais do ambiente.
 PRODUCTION = os.environ.get("PRODUCTION", "False") == "True"
-USE_ZAPPA_TASKS = False
+DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True" and not PRODUCTION
 LOCAL_TASK_MAX_WORKERS = 15
+# Dentro da Lambda, @task invoca esta Lambda de trabalho (a API fica com 512 MB).
+TASK_FUNCTION_NAME = os.environ.get("TASK_FUNCTION_NAME", "")
+# Só para testes manuais do caminho local dentro da Lambda.
+LOCAL_TASK_FORCE = os.environ.get("LOCAL_TASK_FORCE", "0") == "1"
 
 USE_S3 = True
 ALLOWED_HOSTS = [
@@ -110,6 +116,27 @@ DATABASES = {
     }
 }
 
+if PRODUCTION:
+    # Reaproveita a conexão entre requisições da mesma Lambda (economiza o
+    # handshake TLS com o pooler do Neon). O pooler roda em modo "transaction"
+    # (host *-pooler), onde cursor nomeado não sobrevive entre statements.
+    DATABASES["default"].update(
+        CONN_MAX_AGE=60,
+        CONN_HEALTH_CHECK=True,
+        DISABLE_SERVER_SIDE_CURSORS=True,
+    )
+
+# Testes nunca tocam o banco configurado (que pode ser o de produção):
+# sqlite em memória e sem S3.
+TESTING = "test" in sys.argv
+if TESTING:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
+    USE_S3 = False
+
+
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -165,6 +192,31 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Chave do gateway ds2api usado pela tradução de título/descrição (tasks/translate_manhwa.py)
+DS2API_API_KEY = os.environ.get("DS2API_API_KEY", "")
+
+# Evento de 2 h (manhwa/tasks/sync_workers.py): trava por capítulo com
+# validade, backoff exponencial entre tentativas sem progresso e desistência.
+CHAPTER_WORK_LEASE_MINUTES = 45
+# Fila da Lambda de trabalho (concorrência reservada): com muitos capítulos na frente,
+# a task pode começar horas depois do disparo. Esta trava cobre a espera; ao
+# começar, begin_chapter_task volta para a trava acima.
+CHAPTER_QUEUE_LEASE_MINUTES = 360
+CHAPTER_WORK_MAX_ATTEMPTS = 4
+CHAPTER_WORK_BACKOFF_BASE_MINUTES = 30
+CHAPTER_WORK_BACKOFF_MAX_MINUTES = 240
+# Cron na stage `cron` (512 MB, 12x/dia), sem limite de capítulos. O trabalho
+# pesado é @task na Lambda de trabalho e é contabilizado à parte.
+CHAPTER_RUN_SECONDS = 600  # só protege do timeout de 900 s da Lambda
+CHAPTER_DRAIN_SECONDS = 60  # espera da fila local, dentro do teto
+PAGE_MAX_ATTEMPTS = 3  # desistência por página
+PAGE_LEASE_MINUTES = 20
+# 429/5xx do ack do Modal depois de 4 tentativas: não gasta tentativa, só
+# empurra o próximo envio (o endpoint recusa por concorrência, não por erro).
+CHAPTER_SATURATION_BACKOFF_MINUTES = 10
+PAGE_SATURATION_BACKOFF_MINUTES = 10
+REPAIR_PAGE_WORKERS = 4  # páginas em paralelo dentro da task do capítulo
+
 if PRODUCTION:
     CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN")
 
@@ -195,3 +247,12 @@ else:
 
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 TRANSLATOR_URL = os.environ.get("TRANSLATOR_URL")
+# Lambda brscans-fill: recebe o blk_list e chama a IA (tradução).
+FILL_URL = os.environ.get(
+    "FILL_URL",
+    "https://d6xhovagoh.execute-api.sa-east-1.amazonaws.com/dev/",
+)
+
+if TESTING:
+    # storage local: nunca S3 durante testes (precisa vir depois do PRODUCTION)
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"

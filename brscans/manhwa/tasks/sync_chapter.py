@@ -1,3 +1,5 @@
+import os
+
 from django.db.models import Q
 from brscans.utils.tasks import task
 
@@ -9,16 +11,18 @@ from brscans.manhwa.tasks.images_variants import (
     process_image_fill_from_mongo,
 )
 from brscans.utils.image import (
-    batch_images_with_split,
     batch_urls,
     download_images,
+    merge_page_groups,
 )
+from brscans.manhwa.work import begin_chapter_task
 from brscans.wrapper.sources import get_source_by_link
 from brscans.wrapper.sources.Generic import Generic
 
 
 @task
 def sync_chapter(chapter_id: dict, manhwa_id: int):
+    """Scrape (Lambda cron): lê a fonte e manda o merge ao Modal."""
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
 
     # Guard: skip if chapter already has pages (prevents duplication on retry)
@@ -43,7 +47,7 @@ def sync_chapter(chapter_id: dict, manhwa_id: int):
 def sync_chapter_fix(chapter_id: dict):
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
     Source: Generic = get_source_by_link(chapter_records.source)
-    chapter = Source.chapter(chapter_records.source)
+    chapter = Source.chapter(chapter_records)
     chapter_records.quantity_pages = len(chapter["pages"])
     chapter_records.save()
 
@@ -74,41 +78,79 @@ def fix_pages(chapter_id: dict):
     has_mongodb_fallback = False
     try:
         from pymongo import MongoClient
-        mongo_client = MongoClient("mongodb+srv://smcodes:8HmPrzJpJT5AiOR5@brscans-ia.lf9osoc.mongodb.net/?retryWrites=true&w=majority&appName=brscans-ia")
+
+        mongo_uri = os.environ.get("MONGODB_URI")
+        if not mongo_uri:
+            raise RuntimeError("MONGODB_URI não configurada")
+        mongo_client = MongoClient(mongo_uri)
         db = mongo_client["brscans-ia"]
         collection = db["blk_list"]
         has_mongodb_fallback = True
     except Exception as e:
         print("Erro ao inicializar MongoDB no fix_pages:", e)
 
+    failures = []
     for variant in variants:
         if variant.original:
-            # Tenta fallback via MongoDB
+            # O translator guardou o blk_list: retomar no fill evita OCR+inpaint.
             fallback_found = False
             if has_mongodb_fallback:
                 try:
-                    doc = collection.find_one({"image_id": variant.pk})
-                    if doc:
-                        print(f"Encontrou blk_list no MongoDB para variant {variant.pk}. Continuando a partir do fill...")
-                        process_image_fill_from_mongo(variant.pk)
-                        fallback_found = True
+                    fallback_found = bool(
+                        collection.find_one(
+                            {"image_id": variant.pk}, {"_id": 1}
+                        )
+                    )
                 except Exception as e:
                     print(f"Erro ao verificar fallback MongoDB para variant {variant.pk}:", e)
 
-            if not fallback_found:
-                print("Iniciando tradução (do zero via Modal)")
-                process_image_translate(
-                    variant.pk,
-                    variant.original.url,
-                    ["chapters", str(chapter_records.pk)],
-                    chapter_records.manhwa.pk,
-                )
+            try:
+                # `.sync`: o POST precisa falhar aqui para a página ficar com o
+                # motivo em work_last_error; `@task` só enfileira o invoke.
+                if fallback_found:
+                    print(f"blk_list no MongoDB para variant {variant.pk}: continuando do fill")
+                    process_image_fill_from_mongo.sync(variant.pk)
+                else:
+                    print("Iniciando tradução (do zero via Modal)")
+                    process_image_translate.sync(
+                        variant.pk,
+                        variant.original.url,
+                        ["chapters", str(chapter_records.pk)],
+                        chapter_records.manhwa.pk,
+                    )
+            except Exception as e:
+                # Uma página falhando não pode parar o lote das outras; o erro
+                # já ficou registrado na página (_dispatch_ack).
+                print(f"Falha ao disparar variant {variant.pk}:", e)
+                failures.append(variant.pk)
         else:
             print("Variante sem original")
+
+    return {"failed": failures}
 
 
 @task
 def sync_missing_original_pages(chapter_id: int, manhwa_id: int):
+    """Scrape (Lambda cron): lê a fonte e manda o download ao Modal.
+
+    O download/medição (que falha parcial e não pode apagar página boa) fica
+    em apply_missing_originals, com as mesmas proteções.
+    """
+    chapter_records = Chapter.objects.filter(pk=chapter_id).first()
+    if not chapter_records:
+        return {"error": "Chapter not found"}
+
+    Source: Generic = get_source_by_link(chapter_records.source)
+    chapter_data = Source.chapter(chapter_records)
+    page_urls = chapter_data.get("pages", [])
+
+    apply_missing_originals(chapter_id, manhwa_id, page_urls)
+
+    return {"Message": "Missing originals sync dispatched."}
+
+
+@task
+def apply_missing_originals(chapter_id: int, manhwa_id: int, page_urls: list):
     """
     Sincroniza páginas que não têm a variant original.
     Verifica se o número de páginas no BD corresponde ao número de páginas na fonte.
@@ -117,27 +159,23 @@ def sync_missing_original_pages(chapter_id: int, manhwa_id: int):
     chapter_records = Chapter.objects.filter(pk=chapter_id).first()
     if not chapter_records:
         return {"error": "Chapter not found"}
-
-    # Buscar dados do capítulo na fonte
-    Source: Generic = get_source_by_link(chapter_records.source)
-    chapter_data = Source.chapter(chapter_records.source)
-    page_urls = chapter_data.get("pages", [])
+    # A espera na fila da Lambda de trabalho é do merge: a trava curta começa aqui.
+    begin_chapter_task(chapter_records.pk)
 
     # Contar páginas atuais
     current_pages = Page.objects.filter(chapter=chapter_records).order_by("id")
     current_count = current_pages.count()
 
-    # Calcular quantas páginas deveriam existir baseado nas URLs e merge
-    # Primeiro baixar as imagens para calcular corretamente
-    images = download_images(page_urls)
-    expected_pages = len(batch_images_with_split(images))
+    # Calcular quantas páginas deveriam existir: só as dimensões são lidas,
+    # sem manter as imagens na memória. Download parcial apagaria páginas boas.
+    try:
+        expected_pages = len(merge_page_groups(page_urls))
+    except RuntimeError:
+        return {"error": "Falha ao baixar imagens da fonte"}
 
-    # Se o número de páginas não corresponder, recriar todas
+    # Se o número de páginas não corresponder, recriar todas; o merge baixa e
+    # recria num passo só, sem apagar antes.
     if current_count != expected_pages:
-        # Deletar todas as páginas para recriar na ordem correta
-        current_pages.delete()
-
-        # Recriar todas as páginas
         merge_pages_original(
             page_urls,
             chapter_records.pk,
@@ -176,8 +214,9 @@ def sync_missing_original_pages(chapter_id: int, manhwa_id: int):
                 # Obter as URLs para esta página
                 urls_for_page = page_urls[url_index : url_index + urls_needed]
 
-                # Adicionar original à página
-                add_original_to_page(
+                # `.sync`: já estamos na Lambda de trabalho; um disparo aqui só enfileiraria
+                # outra task pesada e a página ficaria sem original até lá.
+                add_original_to_page.sync(
                     page.images.pk,
                     urls_for_page,
                     ["chapters", str(chapter_records.pk)],
@@ -196,15 +235,18 @@ def sync_missing_original_pages(chapter_id: int, manhwa_id: int):
     }
 
 
+@task
 def add_original_to_page(
     variant_id: int, urls: list, folder: list, main_id: str
 ):
     """
     Adiciona a variant original a uma página existente sem deletá-la.
+    Baixa as imagens e faz o merge.
     """
-    # Baixar as imagens das URLs
+    # Baixar as imagens das URLs (falha = exceção; nada é apagado aqui)
     images = download_images(urls)
-
-    if images:
-        # Processar o merge das imagens
+    try:
         merge_batch_original(images, variant_id, folder, main_id)
+    finally:
+        for image in images:
+            image.close()

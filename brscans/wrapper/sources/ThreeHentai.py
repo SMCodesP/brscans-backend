@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 from unidecode import unidecode
@@ -11,6 +12,37 @@ class ThreeHentai(Generic):
     def __init__(self, url, headers=None) -> None:
         super().__init__(url, headers)
         self.name = "ThreeHentai"
+
+    def search(self, query: str):
+        """Busca: `GET /search?q=` → cards `div.doujin a.cover`."""
+        soup = BeautifulSoup(
+            self.client.get(
+                f"{self.url}/search", params={"q": query}
+            ).text,
+            "html.parser",
+        )
+        manhwas = []
+        for card in soup.select("div.doujin"):
+            link = card.find("a", class_="cover", href=True)
+            if not link:
+                continue
+            image = card.find("img")
+            href = urljoin(self.url + "/", link["href"])
+            manhwas.append(
+                {
+                    "id": href.rstrip("/").split("/")[-1],
+                    "title": unidecode(
+                        (card.select_one(".title") or link).get_text(strip=True)
+                    ),
+                    "url": href,
+                    "image": (
+                        image.get("data-src") or image.get("src")
+                    )
+                    if image
+                    else None,
+                }
+            )
+        return manhwas
 
     @staticmethod
     def info(url, capthers: bool = False):
@@ -59,11 +91,14 @@ class ThreeHentai(Generic):
 
     @staticmethod
     def chapters(manhwa: Manhwa):
-        # Return a single chapter representing the whole gallery
-        # If manhwa is a dict (from info calls), handle it
+        # Gallery é o capítulo inteiro. A página é buscada aqui para o health
+        # check validar a URL (antes era estático e não fazia requisição).
         source_url = (
-            manhwa.source if hasattr(manhwa, "source") else manhwa.get("url")
+            manhwa.source
+            if hasattr(manhwa, "source")
+            else (manhwa.get("url") if hasattr(manhwa, "get") else manhwa)
         )
+        ThreeHentai.scraper.get(source_url).raise_for_status()
 
         return [
             {

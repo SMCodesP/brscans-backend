@@ -15,6 +15,21 @@ from brscans.manhwa.models import (
 )
 
 
+def with_quantity_merged(queryset):
+    """Anota o total de páginas após o merge: sem isso, cada capítulo seria
+    serializado com um SUM próprio (N+1). Usar em todo queryset de Chapter que
+    vá para os serializers abaixo."""
+    return queryset.annotate(quantity_merged=Sum("pages__quantity_merged"))
+
+
+def merged_quantity(chapter):
+    """`quantity_merged` da anotação de `with_quantity_merged` ou, num
+    serializer solto fora de view, um SUM avulso."""
+    if hasattr(chapter, "quantity_merged"):
+        return chapter.quantity_merged
+    return chapter.pages.aggregate(total=Sum("quantity_merged"))["total"]
+
+
 class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
@@ -48,7 +63,7 @@ class SimpleChapterSerializer(serializers.ModelSerializer):
     quantity_merged = serializers.SerializerMethodField()
 
     def get_quantity_merged(self, obj):
-        return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
+        return merged_quantity(obj)
 
     class Meta:
         model = Chapter
@@ -68,7 +83,7 @@ class ChapterSerializer(serializers.ModelSerializer):
     quantity_merged = serializers.SerializerMethodField()
 
     def get_quantity_merged(self, obj):
-        return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
+        return merged_quantity(obj)
 
     class Meta:
         model = Chapter
@@ -89,8 +104,10 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
     pages = PageSerializer(many=True)
     quantity_merged = serializers.SerializerMethodField()
 
+    _ordered_chapters = None
+
     def get_quantity_merged(self, obj):
-        return obj.pages.aggregate(total=Sum("quantity_merged"))["total"]
+        return merged_quantity(obj)
 
     def get_slug_number(self, slug):
         numbers = re.findall(r"\d+", slug or "")
@@ -103,14 +120,20 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
         return Decimal(numbers[-1])
 
     def get_ordered_chapters(self, obj):
-        chapters = []
-
-        for chapter in Chapter.objects.filter(manhwa=obj.manhwa):
-            slug_number = self.get_slug_number(chapter.slug)
-            if slug_number is not None:
-                chapters.append((slug_number, chapter.id, chapter))
-
-        return sorted(chapters, key=lambda item: (item[0], item[1]))
+        # Uma vez por serialização: `next` e `previous` pediam a lista inteira
+        # cada um.
+        if self._ordered_chapters is None:
+            chapters = []
+            for chapter in with_quantity_merged(
+                Chapter.objects.filter(manhwa=obj.manhwa)
+            ):
+                slug_number = self.get_slug_number(chapter.slug)
+                if slug_number is not None:
+                    chapters.append((slug_number, chapter.id, chapter))
+            self._ordered_chapters = sorted(
+                chapters, key=lambda item: (item[0], item[1])
+            )
+        return self._ordered_chapters
 
     def get_next(self, obj):
         current_slug_number = self.get_slug_number(obj.slug)
@@ -157,11 +180,20 @@ class ChapterNextPreviousSerializer(serializers.ModelSerializer):
 
 class ManhwaSerializer(serializers.ModelSerializer):
     thumbnail = VariantsSerializer()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
     latest_chapters = serializers.SerializerMethodField()
 
     def get_latest_chapters(self, obj):
-        chapters = obj.chapters.order_by("-id")[:2]
-        return SimpleChapterSerializer(chapters, many=True).data
+        # Listagens de manhwa chegam com `chapters` num Prefetch anotado
+        # (ver ManhwaViewSet.list): 1 SUM por listagem em vez de 2 por item.
+        chapters = getattr(obj, "_prefetched_objects_cache", {}).get("chapters")
+        if chapters is None:
+            chapters = obj.chapters.order_by("-id")[:2]
+        else:
+            chapters = sorted(
+                chapters, key=lambda chapter: chapter.id, reverse=True
+            )
+        return SimpleChapterSerializer(chapters[:2], many=True).data
 
     class Meta:
         model = Manhwa
@@ -173,6 +205,7 @@ class ManhwaSerializer(serializers.ModelSerializer):
             "original_title",
             "author",
             "status",
+            "status_display",
             "description",
             "original_description",
             "external_id",
@@ -188,6 +221,7 @@ class ManhwaSerializer(serializers.ModelSerializer):
 
 class ManhwaDetailSerializer(serializers.ModelSerializer):
     thumbnail = VariantsSerializer()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
     chapters = SimpleChapterSerializer(many=True)
 
     class Meta:
@@ -200,6 +234,7 @@ class ManhwaDetailSerializer(serializers.ModelSerializer):
             "original_title",
             "author",
             "status",
+            "status_display",
             "description",
             "original_description",
             "external_id",

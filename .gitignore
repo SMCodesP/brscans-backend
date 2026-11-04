@@ -60,3 +60,8 @@ celerybeat-schedule
 credentials/*.json
 
 .env
+# saídas locais de teste e dumps
+/c/
+/chapters/
+*.zip
+brscans/manhwa/management/commands/data.json

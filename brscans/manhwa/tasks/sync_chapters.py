@@ -1,6 +1,6 @@
 from brscans.utils.tasks import task
 
-from brscans.manhwa.models import Chapter, Manhwa
+from brscans.manhwa.models import Chapter, Manhwa, ManhwaStatus
 from brscans.manhwa.tasks.sync_chapter import sync_chapter
 from brscans.wrapper import sources
 from brscans.wrapper.sources.Generic import Generic
@@ -8,7 +8,10 @@ from brscans.wrapper.sources.Generic import Generic
 
 @task
 def sync_chapters(manhwa_id: int, limit: int = 5):
+    """Cada capítulo novo vira outra task (sync_chapter)."""
     manhwa = Manhwa.objects.filter(id=manhwa_id).first()
+    if manhwa.status == ManhwaStatus.COMPLETED:
+        return {"Message": "Obra completa: capítulos não são mais sincronizados."}
     Source: Generic = sources.get_source_by_link(manhwa.source)
     chapters = Source.chapters(manhwa)
     # chapters = reversed(chapters)

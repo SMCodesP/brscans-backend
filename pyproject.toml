@@ -32,6 +32,7 @@ dependencies = [
     "zappa>=0.61.4",
     "cloudscraper>=1.2.71",
     "openai>=2.24.0",
+    "pymongo==4.17.0",
 ]
 
 [build-system]
