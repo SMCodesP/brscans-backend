@@ -271,6 +271,22 @@ class PanelMigrationContractTests(TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertIn("detail", response.data)
 
+    def test_source_info_shows_chapters_and_local_manhwa(self):
+        url = "https://novo.com/manga/x/"
+        Manhwa.objects.filter(pk=self.manhwa.pk).update(source=url)
+        with mock.patch(
+            "brscans.manhwa.views.panel.get_source_by_link",
+            return_value=source([{"id": "chapter-1", "title": "Cap 1", "url": url + "chapter-1/"}]),
+        ):
+            response = self.client.get(f"/panel/sources/info/?url={url}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["chapters"][0]["title"], "Cap 1")
+        self.assertEqual(response.data["manhwa"]["id"], self.manhwa.pk)
+
+    def test_source_info_requires_url(self):
+        response = self.client.get("/panel/sources/info/?url=ftp://x")
+        self.assertEqual(response.status_code, 400)
+
     def test_migrate_success(self):
         with mock.patch(
             "brscans.manhwa.views.panel.migrate_manhwa",

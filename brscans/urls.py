@@ -22,6 +22,7 @@ from brscans.manhwa.views.panel import (
     PanelChapterViewSet,
     PanelManhwaViewSet,
     PanelProblemViewSet,
+    PanelSourceInfoView,
     PanelSourceView,
 )
 
@@ -53,6 +54,7 @@ urlpatterns = (
         path(r"", include(client_router.urls)),
         path("panel/", include(panel_router.urls)),
         path("panel/sources/", PanelSourceView.as_view()),
+        path("panel/sources/info/", PanelSourceInfoView.as_view()),
         path("panel/sources/<str:name>/search/", PanelSourceView.as_view()),
         path(r"", include("brscans.authentication.urls")),
         path("admin/", admin.site.urls),

@@ -1,4 +1,6 @@
 import threading
+from hashlib import sha256
+from types import SimpleNamespace
 from urllib.parse import urljoin
 
 from django.db.models import Case, Count, Q, When
@@ -23,7 +25,11 @@ from brscans.manhwa.tasks.panel import (
     panel_sync_manhwa,
 )
 from brscans.pagination import TotalPagination
-from brscans.wrapper.sources import get_searchable_source, searchable_sources
+from brscans.wrapper.sources import (
+    get_searchable_source,
+    get_source_by_link,
+    searchable_sources,
+)
 
 
 def _limit(value):
@@ -332,6 +338,31 @@ class PanelChapterViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
+def _bounded(fn, seconds):
+    """Roda `fn()` com teto de tempo; `None` = estourou.
+
+    O wrapper usa timeout=None, então uma resposta que não chega trava a
+    request para sempre. Thread daemon (como health.py): a pendurada não
+    segura a resposta, e um pool fixo ficaria sem vaga para as outras
+    buscas que o front dispara em paralelo. A exceção da thread volta
+    aqui: o `try` do caller já vira 502 com o motivo.
+    """
+    result, error = [], []
+
+    def run():
+        try:
+            result.append(fn())
+        except Exception as exc:  # noqa: BLE001 - vira 502 no caller
+            error.append(exc)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(seconds)
+    if error:
+        raise error[0]
+    return result[0] if result else None
+
+
 class PanelSourceView(APIView):
     """Fontes pesquisáveis e busca em uma só (o front chama uma por fonte).
 
@@ -340,30 +371,6 @@ class PanelSourceView(APIView):
 
     permission_classes = [IsAdminUser]
     SEARCH_TIMEOUT = 25  # API Gateway corta em 29 s
-
-    def _search(self, search, query):
-        """Roda `search(query)` com teto de tempo; `None` = estourou.
-
-        O wrapper usa timeout=None, então uma resposta que não chega trava a
-        request para sempre. Thread daemon (como health.py): a pendurada não
-        segura a resposta, e um pool fixo ficaria sem vaga para as outras
-        buscas que o front dispara em paralelo. A exceção da thread volta
-        aqui: o `try` do caller já vira 502 com o motivo.
-        """
-        result, error = [], []
-
-        def run():
-            try:
-                result.extend(search(query) or [])
-            except Exception as exc:  # noqa: BLE001 - vira 502 no caller
-                error.append(exc)
-
-        thread = threading.Thread(target=run, daemon=True)
-        thread.start()
-        thread.join(self.SEARCH_TIMEOUT)
-        if error:
-            raise error[0]
-        return None if thread.is_alive() else result
 
     def get(self, request, name=None):
         if name is None:
@@ -378,7 +385,10 @@ class PanelSourceView(APIView):
         if not query:
             return Response({"source": name, "results": []})
         try:
-            items = self._search(Source(f"https://{name}").search, query)
+            items = _bounded(
+                lambda: Source(f"https://{name}").search(query) or [],
+                self.SEARCH_TIMEOUT,
+            )
         except Exception as exc:  # noqa: BLE001 - a resposta é o relatório
             return Response(
                 {"detail": f"{type(exc).__name__}: {exc}"[:300]}, status=502
@@ -406,6 +416,64 @@ class PanelSourceView(APIView):
                     }
                     for item in items
                 ],
+            }
+        )
+
+
+class PanelSourceInfoView(APIView):
+    """Ficha de uma URL da fonte (antes de importar) e o manga local, se já existe."""
+
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        url = (request.query_params.get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            return Response({"url": ["Informe a URL do manga."]}, status=400)
+        Source = get_source_by_link(url)
+
+        def fetch():
+            info = Source.info(url) or {}
+            # Mesmo formato que migrate_manhwa: chapters() lê só `.source`.
+            return info, Source.chapters(SimpleNamespace(source=url)) or []
+
+        try:
+            fetched = _bounded(fetch, PanelSourceView.SEARCH_TIMEOUT)
+        except Exception as exc:  # noqa: BLE001 - a resposta é o relatório
+            return Response(
+                {"detail": f"{type(exc).__name__}: {exc}"[:300]}, status=502
+            )
+        if fetched is None:
+            return Response(
+                {"detail": "A fonte demorou demais para responder."}, status=502
+            )
+        info, chapters = fetched
+        identifier = sha256(url.encode("utf-8")).hexdigest()
+        manhwa = (
+            Manhwa.objects.filter(Q(identifier=identifier) | Q(source=url))
+            .annotate(chapters_count=Count("chapters"))
+            .first()
+        )
+        return Response(
+            {
+                "url": url,
+                "title": info.get("title") or "",
+                "summary": info.get("summary") or "",
+                "image": info.get("image") or None,
+                "chapters": [
+                    {
+                        "id": str(c.get("id") or ""),
+                        "title": c.get("title") or "",
+                        "url": c.get("url") or "",
+                        "release_date": c.get("release_date") or "",
+                    }
+                    for c in chapters
+                ],
+                "manhwa": manhwa
+                and {
+                    "id": manhwa.id,
+                    "title": manhwa.title,
+                    "chapters_count": manhwa.chapters_count,
+                },
             }
         )
 
