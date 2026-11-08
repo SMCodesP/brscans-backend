@@ -91,6 +91,33 @@ class ComizyTests(unittest.TestCase):
         self.assertEqual(chapters[0]["url"], "https://comizy.io/obra/chapter-3")
         self.assertEqual(chapters[0]["release_date"], "2026-10-16")
 
+    def test_le_lista_completa_da_api_quando_tem_id(self) -> None:
+        # O __NEXT_DATA__ corta em 50; os primeiros capítulos só vêm na API.
+        import json
+
+        manga = {
+            "id": "abc",
+            "slug": "obra",
+            "chapters": [{"name": "Chapter 2", "slug": "chapter-2", "url": "/obra/chapter-2"}],
+        }
+        page = FakeResponse(
+            next_data({"props": {"pageProps": {"initialManga": manga}}}),
+            "https://comizy.io/obra",
+        )
+        api = httpx.Response(
+            200,
+            text=json.dumps({"success": True, "data": {"chapters": [
+                {"name": "Chapter 2", "slug": "chapter-2", "url": "/obra/chapter-2", "updated_at": "2026-11-02T00:00:00Z"},
+                {"name": "Chapter 1", "slug": "chapter-1", "url": "/obra/chapter-1"},
+            ]}}),
+            request=httpx.Request("GET", "https://api.comizy.io/titles/abc/chapters"),
+        )
+        with mock.patch.object(httpx, "get", side_effect=[page, api]) as get:
+            chapters = Comizy.chapters("https://comizy.io/obra")
+        self.assertEqual(get.call_args_list[1].args[0], "https://api.comizy.io/titles/abc/chapters")
+        self.assertEqual([c["id"] for c in chapters], ["chapter-2", "chapter-1"])
+        self.assertEqual(chapters[0]["release_date"], "2026-11-02")
+
     def test_busca_com_ampersand_nao_corta_a_query(self) -> None:
         # Título com `&` ia solto na URL e o site recebia só "Foxy Gil ".
         source = Comizy("https://comizy.io")

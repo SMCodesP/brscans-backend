@@ -23,6 +23,8 @@ class Comizy:
         "Accept-Language": "en-US,en;q=0.9",
     }
 
+    API = "https://api.comizy.io"
+
     def __init__(self, url=None, headers=None) -> None:
         self.url = url
         self.headers = headers or self.HEADERS
@@ -99,18 +101,33 @@ class Comizy:
         manga = Comizy._manga(response.text)
         site = re.match(r"https?://[^/]+", str(response.url)).group(0)
 
-        chapters = []
-        for item in manga.get("chapters") or []:
-            url = site + item["url"]
-            chapters.append(
-                {
-                    "id": item["slug"],
-                    "title": unidecode(item.get("name") or item["slug"]),
-                    "url": url,
-                    "release_date": (item.get("updatedAt") or "")[:10],
-                }
-            )
-        return chapters
+        return [
+            {
+                "id": item["slug"],
+                "title": unidecode(item.get("name") or item["slug"]),
+                "url": site + item["url"],
+                "release_date": (
+                    item.get("updatedAt") or item.get("updated_at") or ""
+                )[:10],
+            }
+            for item in Comizy._all_chapters(manga)
+        ]
+
+    @staticmethod
+    def _all_chapters(manga: dict) -> list[dict]:
+        """O __NEXT_DATA__ só traz os 50 mais recentes; a API do site traz todos."""
+        embedded = manga.get("chapters") or []
+        if not manga.get("id"):
+            return embedded
+        try:
+            response = Comizy._get(f"{Comizy.API}/titles/{manga['id']}/chapters")
+            response.raise_for_status()
+            items = (response.json().get("data") or {}).get("chapters") or []
+        except (httpx.HTTPError, ValueError) as exc:
+            print(f"[comizy] API de capítulos falhou, usando o HTML: {exc}")
+            return embedded
+        # API com menos itens que o HTML = resposta quebrada; fica com o HTML.
+        return items if len(items) >= len(embedded) else embedded
 
     @staticmethod
     def pages(chapter: Chapter, content: str = None):
