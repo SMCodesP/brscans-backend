@@ -62,6 +62,13 @@ class PostAckTests(SimpleTestCase):
                 )
         self.assertEqual(post.call_count, 2)
 
+    def test_500_from_throttled_fill_is_retried(self):
+        responses = [httpx.Response(500), httpx.Response(202, json={})]
+        with mock.patch("httpx.post", side_effect=responses) as post:
+            with mock.patch.object(tasks.time, "sleep"):
+                tasks._post_ack("http://ack", {"image_id": 1})
+        self.assertEqual(post.call_count, 2)
+
     def test_read_timeout_is_not_retried(self):
         with mock.patch(
             "httpx.post", side_effect=httpx.ReadTimeout("slow")
@@ -77,7 +84,7 @@ class PostAckTests(SimpleTestCase):
             with mock.patch.object(tasks.time, "sleep"):
                 with self.assertRaises(tasks.Saturation):
                     tasks._post_ack("http://ack", {"image_id": 1})
-        self.assertEqual(post.call_count, 4)
+        self.assertEqual(post.call_count, tasks.ACK_ATTEMPTS)
 
     def test_contract_error_is_not_retried(self):
         with mock.patch(

@@ -93,7 +93,10 @@ def _remote_dispatch(func, args, kwargs):
 
 # 429 do Modal é recusa por concorrência: o pedido NÃO foi aceito, então
 # repetir não duplica trabalho no ack (que ainda é idempotente por claim).
-_ACK_RETRY_STATUS = {429, 502, 503, 504}
+# 500 é o que o API Gateway devolve quando a brscans-fill bate na concorrência
+# reservada (proteção das conexões do Mongo M0); 6 tentativas ≈ 31 s de espera.
+_ACK_RETRY_STATUS = {429, 500, 502, 503, 504}
+ACK_ATTEMPTS = 6
 
 
 class Saturation(RuntimeError):
@@ -114,8 +117,8 @@ def _post_ack(url, payload):
     resolvem a página no próximo ciclo."""
     urls = url.split(",")
     first = int(payload.get("image_id") or payload.get("id") or 0)
-    for attempt in range(4):
-        last = attempt == 3
+    for attempt in range(ACK_ATTEMPTS):
+        last = attempt == ACK_ATTEMPTS - 1
         target = urls[(first + attempt) % len(urls)]
         try:
             response = httpx.post(target, json=payload, timeout=10.0)
