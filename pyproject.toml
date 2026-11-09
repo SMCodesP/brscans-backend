@@ -47,3 +47,6 @@ dev = ["ruff>=0.13.1"]
 
 [tool.ruff]
 line-length = 80
+
+[tool.uv.sources]
+zappa = { git = "https://github.com/SMCodesP/Zappa.git", branch = "fix/double-redirect" }

@@ -180,7 +180,7 @@ requires-dist = [
     { name = "unidecode", specifier = "==1.3.8" },
     { name = "whitenoise", specifier = ">=6.7.0,<7" },
     { name = "xmltodict", specifier = ">=0.13.0,<0.14" },
-    { name = "zappa", specifier = ">=0.61.4" },
+    { name = "zappa", git = "https://github.com/SMCodesP/Zappa.git?branch=fix%2Fdouble-redirect" },
 ]
 
 [package.metadata.requires-dev]
@@ -1176,8 +1176,8 @@ wheels = [
 
 [[package]]
 name = "zappa"
-version = "0.61.4"
-source = { registry = "https://pypi.org/simple" }
+version = "0.62.0"
+source = { git = "https://github.com/SMCodesP/Zappa.git?branch=fix%2Fdouble-redirect#34152bdd5f39b15b7f0ae46050f458e679f5a576" }
 dependencies = [
     { name = "argcomplete" },
     { name = "boto3" },
@@ -1196,8 +1196,4 @@ dependencies = [
     { name = "troposphere" },
     { name = "werkzeug" },
     { name = "wheel" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fd/de/2337eefd42427ca0325554b6e98f4e2decfd06f74e1ebf3134eea30ae6b1/zappa-0.61.4.tar.gz", hash = "sha256:f941285c07a65bdbb37ee793099d198740fb552c4b0bfc6069340337730b2d5c", size = 239444, upload-time = "2026-01-08T06:08:56.652Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/8a/ae3c4da855640a0825c19ccdd7117abb2cbc77775898a665c1b876dd778e/zappa-0.61.4-py3-none-any.whl", hash = "sha256:ee60bce0654f4223458b58bd39529d7a52a82fe2c084e09b67976dd6b73dbe17", size = 136214, upload-time = "2026-01-08T06:08:54.452Z" },
 ]
