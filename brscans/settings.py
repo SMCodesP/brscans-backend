@@ -250,7 +250,7 @@ TRANSLATOR_URL = os.environ.get("TRANSLATOR_URL")
 # Lambda brscans-fill: recebe o blk_list e chama a IA (tradução).
 FILL_URL = os.environ.get(
     "FILL_URL",
-    "https://d6xhovagoh.execute-api.sa-east-1.amazonaws.com/dev/",
+    "https://cmriceom7j.execute-api.sa-east-1.amazonaws.com/dev/",
 )
 
 if TESTING:
