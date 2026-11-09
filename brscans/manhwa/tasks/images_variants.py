@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from brscans.manhwa.models import ImageVariants, Page
+from brscans.manhwa.models import ImageVariants, Manhwa, Page
 from brscans.manhwa.work import begin_chapter_task
 from brscans.utils.generate_presigned_url import generate_presigned_url
 from brscans.utils.image import (
@@ -175,6 +175,17 @@ def _dispatch_ack(variant_id: int, url: str, payload: dict) -> dict:
         raise
 
 
+def _manga_summary(main_id) -> str | None:
+    """Título e sinopse da fonte para o prompt: sem eles o tradutor chuta o
+    gênero dos personagens (ex.: protagonista disfarçada de homem)."""
+    if not main_id:
+        return None
+    row = Manhwa.objects.filter(pk=main_id).values("title", "description").first()
+    if not row:
+        return None
+    return f"{row['title']}\n{row['description'] or ''}".strip()[:2000]
+
+
 @task
 def process_image_translate(id, url: str, folder: str, main_id: str = None):
     path, content_type = image_destination(
@@ -194,6 +205,7 @@ def process_image_translate(id, url: str, folder: str, main_id: str = None):
             "context": join("contexts", str(main_id), "context.json"),
             "path": path,
             "folder": join(*folder),
+            "summary": _manga_summary(main_id),
         },
     )
     return {"Message": "Image translation accepted."}
