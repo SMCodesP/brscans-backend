@@ -212,6 +212,15 @@ class TestVariantEditing(PanelTestBase):
         other.refresh_from_db()
         self.assertEqual(other.previous_translated, previous)
 
+    def test_pipeline_patch_is_not_manual(self):
+        bot = User.objects.create_user("translator", password="x", is_staff=True)
+        response = self.client_for(bot).patch(
+            self.url, {"translated": self.images.original.name}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.images.refresh_from_db()
+        self.assertFalse(self.images.manual_translated)
+
     def test_use_original_endpoint(self):
         original = self.images.original.name
         response = self.client_for(self.staff).post(f"{self.url}use-original/")

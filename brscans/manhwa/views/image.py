@@ -13,6 +13,8 @@ from brscans.pagination import TotalPagination
 from brscans.utils.image_contract import normalize_image_path
 
 EDITABLE = ("raw", "original", "translated")
+# Usuário do token do tradutor/filler: o PATCH dele é o pipeline, não edição manual.
+PIPELINE_USERNAME = "translator"
 
 
 class ReadOrStaffWrite(BasePermission):
@@ -60,7 +62,11 @@ class VariantsEditSerializer(serializers.ModelSerializer):
             # não perde a anterior e fica registrado que foi edição manual
             if instance.translated:
                 instance.previous_translated = instance.translated.name
-            instance.manual_translated = True
+            request = self.context.get("request")
+            # Sem isso toda página saída do filler ficava "manual" e o
+            # conserto do painel nunca mais a retraduzia.
+            if not request or request.user.username != PIPELINE_USERNAME:
+                instance.manual_translated = True
         return super().update(instance, validated_data)
 
     class Meta:
@@ -77,7 +83,7 @@ class ImageVariantViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = VariantsEditSerializer(
-            instance, data=request.data, partial=True
+            instance, data=request.data, partial=True, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
