@@ -12,7 +12,7 @@ from brscans.manhwa.tasks.images_variants import (
 )
 from brscans.utils.image import (
     batch_urls,
-    download_images,
+    download_pieces,
     merge_page_groups,
 )
 from brscans.manhwa.work import begin_chapter_task
@@ -169,9 +169,10 @@ def apply_missing_originals(chapter_id: int, manhwa_id: int, page_urls: list):
     # Calcular quantas páginas deveriam existir: só as dimensões são lidas,
     # sem manter as imagens na memória. Download parcial apagaria páginas boas.
     try:
-        expected_pages = len(merge_page_groups(page_urls))
+        groups = merge_page_groups(page_urls)
     except RuntimeError:
         return {"error": "Falha ao baixar imagens da fonte"}
+    expected_pages = len(groups)
 
     # Se o número de páginas não corresponder, recriar todas; o merge baixa e
     # recria num passo só, sem apagar antes.
@@ -198,34 +199,21 @@ def apply_missing_originals(chapter_id: int, manhwa_id: int, page_urls: list):
     if pages_without_original.count() == 0:
         return {"message": "No pages without original found"}
 
-    # Processar cada página individualmente
+    # Mesma contagem = mesma divisão: a página N é o grupo N. Fatiar
+    # `page_urls` por `quantity_merged` desalinhava com imagem partida
+    # (um pedaço não é uma URL).
     processed_count = 0
-    url_index = 0
-
-    for page in current_pages:
-        # Quantas URLs esta página precisa (baseado em quantity_merged)
-        urls_needed = page.quantity_merged or 1
-
-        # Se esta página não tem original
-        if page.images and (
-            not page.images.original or page.images.original == ""
-        ):
-            if url_index + urls_needed <= len(page_urls):
-                # Obter as URLs para esta página
-                urls_for_page = page_urls[url_index : url_index + urls_needed]
-
-                # `.sync`: já estamos na Lambda de trabalho; um disparo aqui só enfileiraria
-                # outra task pesada e a página ficaria sem original até lá.
-                add_original_to_page.sync(
-                    page.images.pk,
-                    urls_for_page,
-                    ["chapters", str(chapter_records.pk)],
-                    manhwa_id,
-                )
-                processed_count += 1
-
-        # Avançar o índice de URLs
-        url_index += urls_needed
+    for page, group in zip(current_pages, groups):
+        if page.images and not page.images.original:
+            # `.sync`: já estamos na Lambda de trabalho; um disparo aqui só enfileiraria
+            # outra task pesada e a página ficaria sem original até lá.
+            add_original_to_page.sync(
+                page.images.pk,
+                group,
+                ["chapters", str(chapter_records.pk)],
+                manhwa_id,
+            )
+            processed_count += 1
 
     return {
         "message": "Missing originals added successfully",
@@ -241,10 +229,11 @@ def add_original_to_page(
 ):
     """
     Adiciona a variant original a uma página existente sem deletá-la.
-    Baixa as imagens e faz o merge.
+    Baixa as imagens e faz o merge. `urls`: URLs inteiras (painel) ou os
+    pedaços (url, top, height) de um grupo de `merge_page_groups`.
     """
     # Baixar as imagens das URLs (falha = exceção; nada é apagado aqui)
-    images = download_images(urls)
+    images = download_pieces(urls)
     try:
         merge_batch_original(images, variant_id, folder, main_id)
     finally:

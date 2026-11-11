@@ -209,8 +209,24 @@ def download_images(urls):
     return images
 
 
+def download_pieces(group):
+    """Baixa um grupo de `merge_page_groups`, recortando imagem partida.
+
+    Sem o recorte a imagem inteira (> 16383 px) ia para o WebP e o encode
+    falhava ("encoding error 5"). URL solta (painel) é a imagem inteira.
+    """
+    pieces = [(p, 0, None) if isinstance(p, str) else p for p in group]
+    images = download_images([url for url, _, _ in pieces])
+    return [
+        image.crop((0, top, image.width, top + height))
+        if height and image.height > height
+        else image
+        for image, (_, top, height) in zip(images, pieces)
+    ]
+
+
 def merge_page_groups(urls):
-    """URLs agrupadas sem manter as imagens na memória.
+    """Pedaços (url, top, height) agrupados, sem as imagens na memória.
 
     Mesma divisão de `batch_urls`: largura diferente ou grupo passando de
     8191 px fecham o grupo; imagem acima de 16383 px é partida antes. Cada
@@ -228,11 +244,12 @@ def merge_page_groups(urls):
     for url, (width, height) in sizes:
         # imagem acima de 16383 px é partida antes de agrupar
         for top in range(0, height, 16383):
-            pieces.append(IMG(width, min(top + 16383, height) - top, url))
+            pieces.append(IMG(width, min(top + 16383, height) - top, url, top))
     # A divisão é do `batch_urls`; o grupo vazio que ele deixa na troca de
-    # largura não vira página.
+    # largura não vira página. O pedaço leva o intervalo (top, height): a
+    # imagem partida repete a URL e quem baixa precisa recortar.
     return [
-        [piece.url for piece in group]
+        [(piece.url, piece.top, piece.height) for piece in group]
         for group in batch_urls(pieces)
         if group
     ]
@@ -241,10 +258,10 @@ def merge_page_groups(urls):
 class IMG:
     """O que `batch_urls` lê de uma imagem, com a URL no lugar dos pixels."""
 
-    __slots__ = ("width", "height", "url")
+    __slots__ = ("width", "height", "url", "top")
 
-    def __init__(self, width, height, url):
-        self.width, self.height, self.url = width, height, url
+    def __init__(self, width, height, url, top=0):
+        self.width, self.height, self.url, self.top = width, height, url, top
 
 
 def _url_and_size(url):

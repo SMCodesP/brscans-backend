@@ -11,7 +11,7 @@ from brscans.manhwa.models import ImageVariants, Manhwa, Page
 from brscans.manhwa.work import begin_chapter_task
 from brscans.utils.generate_presigned_url import generate_presigned_url
 from brscans.utils.image import (
-    download_images,
+    download_pieces,
     merge_page_groups,
     process_merge_images,
 )
@@ -83,7 +83,9 @@ def merge_pages_original(
     # invoke do worker pelo tempo de 300 idas ao tradutor.
     def dispatch(variant):
         try:
-            process_image_translate(
+            # `.sync`: como @task, cada página virava um invoke no worker de
+            # 1 GB só para esperar o ack; a espera fica nestas threads.
+            process_image_translate.sync(
                 variant.pk, variant.original.url, folder, main_id
             )
         except Exception as e:
@@ -107,9 +109,9 @@ def _already_merged(existing_pages, groups) -> bool:
     return all(page.images and page.images.original for page in pages)
 
 
-def merge_group(urls: list) -> ContentFile:
+def merge_group(group: list) -> ContentFile:
     """Baixa e funde um grupo; as imagens saem da memória em seguida."""
-    images = download_images(urls)
+    images = download_pieces(group)
     try:
         return process_merge_images(images)
     finally:
@@ -136,7 +138,7 @@ def merge_batch_original(
     try:
         variants = ImageVariants.objects.filter(id=variant_id).first()
         _save_original(variants, image, folder)
-        process_image_translate(
+        process_image_translate.sync(
             variants.pk, variants.original.url, folder, main_id
         )
     finally:

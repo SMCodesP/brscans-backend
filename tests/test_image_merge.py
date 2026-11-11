@@ -62,6 +62,39 @@ class PageDivisionTests(TestCase):
         # não cabe em 8191, então viram duas páginas)
         self.assertEqual(self.division([(800, 20000)]), [1, 1])
 
+    def test_imagem_partida_e_recortada_antes_do_webp(self):
+        """Colar a imagem inteira em cada pedaço passava de 16383 px."""
+        from io import BytesIO
+
+        def tall():
+            image = Image.new("RGB", (64, 20000))
+            image.paste((255, 0, 0), (0, 16383, 64, 20000))
+            return image
+
+        sizes = [(64, 20000), (64, 1000)]
+        with mock.patch.object(
+            img, "download_head", side_effect=sizes_to_images(sizes)
+        ):
+            groups = img.merge_page_groups(["alta", "curta"])
+        # o resto da imagem partida agrupa com a próxima
+        self.assertEqual(
+            groups,
+            [[("alta", 0, 16383)], [("alta", 16383, 3617), ("curta", 0, 1000)]],
+        )
+
+        source = {"alta": tall, "curta": lambda: Image.new("RGB", (64, 1000))}
+        with mock.patch.object(
+            img, "download_image", side_effect=lambda url: source[url]()
+        ):
+            merged = [
+                Image.open(BytesIO(tasks.merge_group(group).read()))
+                for group in groups
+            ]
+        self.assertEqual([m.size for m in merged], [(64, 16383), (64, 4617)])
+        # o segundo pedaço começa no trecho de baixo (vermelho), não no topo
+        self.assertGreater(merged[1].getpixel((5, 5))[0], 200)
+        self.assertLess(merged[0].getpixel((5, 5))[0], 50)
+
     def test_download_falhando_nao_recorta_a_lista(self):
         with mock.patch.object(img, "download_head", return_value=None), (
             mock.patch.object(img, "download_image", return_value=None)
@@ -112,7 +145,7 @@ class MergePagesOriginalTests(TestCase):
         with mock.patch.object(
             tasks, "merge_page_groups", return_value=[["a"], ["b"]]
         ), mock.patch.object(
-            tasks, "download_images", side_effect=RuntimeError("fonte caiu")
+            tasks, "download_pieces", side_effect=RuntimeError("fonte caiu")
         ):
             with self.assertRaises(RuntimeError):
                 tasks.merge_pages_original.sync([], self.chapter.pk, ["c"])
@@ -129,7 +162,7 @@ class MergePagesOriginalTests(TestCase):
 
         with mock.patch.object(
             tasks, "merge_page_groups", return_value=[["a", "b"], ["c"]]
-        ), mock.patch.object(tasks, "download_images", side_effect=download):
+        ), mock.patch.object(tasks, "download_pieces", side_effect=download):
             tasks.merge_pages_original.sync([], self.chapter.pk, ["c"])
 
         pages = list(self.chapter.pages.order_by("order"))
@@ -142,7 +175,7 @@ class MergePagesOriginalTests(TestCase):
         """A fila do Modal pode passar da trava; o disparo repetido sai cedo."""
         with mock.patch.object(
             tasks, "merge_page_groups", return_value=[["a"], ["b"], ["c"]]
-        ), mock.patch.object(tasks, "download_images") as download:
+        ), mock.patch.object(tasks, "download_pieces") as download:
             result = tasks.merge_pages_original.sync(
                 [], self.chapter.pk, ["c"]
             )
@@ -175,7 +208,7 @@ class MergePagesOriginalTests(TestCase):
         with mock.patch.object(
             tasks, "merge_page_groups", return_value=[["a"], ["b"]]
         ), mock.patch.object(
-            tasks, "download_images",
+            tasks, "download_pieces",
             side_effect=lambda urls: sizes_to_images([(800, 1000)] * len(urls)),
         ) as download:
             tasks.merge_pages_original.sync([], self.chapter.pk, ["c"])

@@ -481,7 +481,7 @@ class SourceFixesTests(TestCase):
         chapter = chapter_with_pages(translated=2)
         with mock.patch.object(
             module, "merge_page_groups", side_effect=RuntimeError("fonte caiu")
-        ), mock.patch.object(module, "download_images", return_value=[object()]):
+        ), mock.patch.object(module, "download_pieces", return_value=[object()]):
             result = module.apply_missing_originals.sync(
                 chapter.pk, chapter.manhwa_id, ["a", "b", "c"]
             )
